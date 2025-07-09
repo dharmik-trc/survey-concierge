@@ -7,9 +7,11 @@ services:
       POSTGRES_USER: survey_user
       POSTGRES_PASSWORD: survey_password
     ports:
-      - "5432:5432"
+      - "5485:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5485"
     restart: unless-stopped
 
   backend:
@@ -18,12 +20,14 @@ services:
       dockerfile: Dockerfile.dev
     container_name: survey_backend_dev
     ports:
-      - "9000:8000"
+      - "9000:9000"
     volumes:
       - ./backend:/app
     environment:
       - DJANGO_DEBUG=True
       - DATABASE_URL=postgresql://survey_user:survey_password@postgres:5432/survey_db
+      - USE_X_FORWARDED_HOST=True
+      - USE_X_FORWARDED_PORT=True
     depends_on:
       - postgres
     restart: unless-stopped
