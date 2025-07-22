@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: survey-backend
+    env: python
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: gunicorn backend.wsgi:application
+    envVars:
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_HOSTS
+        value: survey-backend.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend.settings
+      - key: DJANGO_DEBUG
+        value: "False"
+    plan: free
