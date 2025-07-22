@@ -1,6 +1,21 @@
-# Survey Platform
+- combine all the answer one field and type of answer as different field
+- hit the api on every next button click
+- salary questions in the survey
+- Give soft reminder to the user when total sum is 0 (for form numeric questions, example: 27 - salary)
 
-A full-stack survey platform built with Next.js frontend and Django backend, featuring step-by-step survey forms, real-time validation, and comprehensive response tracking.
+# Survey Concierge - Professional Survey Platform
+
+A modern, full-stack survey platform built with Next.js frontend and Django backend, featuring step-by-step survey forms, real-time validation, and comprehensive response tracking. Survey Concierge provides a professional solution for creating, managing, and analyzing surveys with a beautiful, branded interface.
+
+## 🎨 Branding
+
+Survey Concierge features a modern, professional design with:
+
+- **Brand Colors**: Indigo to Purple gradient theme
+- **Modern UI**: Clean, responsive design with smooth animations
+- **Professional Logo**: Custom SVG icon with gradient branding
+- **Consistent Styling**: Unified design language across all components
+- **Accessibility**: WCAG compliant with proper focus states and contrast
 
 ## 🚀 Features
 
@@ -10,6 +25,8 @@ A full-stack survey platform built with Next.js frontend and Django backend, fea
 - **Response Tracking**: IP address, location, user agent tracking
 - **Admin Panel**: Comprehensive response management with email display
 - **Modern UI**: Built with Next.js 15 and Tailwind CSS
+- **Professional Branding**: Custom Survey Concierge branding with gradient themes
+- **Responsive Design**: Mobile-first approach with beautiful animations
 - **RESTful API**: Django backend with PostgreSQL database
 - **Docker Support**: Easy deployment with Docker and Docker Compose
 

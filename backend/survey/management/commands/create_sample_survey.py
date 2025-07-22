@@ -58,7 +58,84 @@ class Command(BaseCommand):
                 'question_type': 'number',
                 'is_required': True,
                 'order': 6
-            }
+            },
+            {
+                'question_text': 'Revenue of your association in GBP based on your latest approved financial statements:',
+                'question_type': 'matrix',
+                'is_required': True,
+                'order': 7,
+                'subfields': [
+                    'Membership subscriptions',
+                    'Sponsorship/partnership',
+                    'Training/accreditations',
+                    'Other',
+                    'TOTAL REVENUE'
+                ]
+            },
+            {
+                'question_text': 'Which of the following membership benefits does your association offer to its members? Please select all that apply.',
+                'question_type': 'checkbox',
+                'is_required': True,
+                'order': 8,
+                'options': [
+                    'Events and conferences',
+                    'Access to supplier directory',
+                    'Awards',
+                    'Newsletter/publication',
+                    'Research and insights',
+                    'Legal support',
+                    'Other, please specify',
+                    'Insurance',
+                    'Policy and lobbying',
+                    'Mentoring and career support',
+                    'Discounts/referral with approved suppliers/partners'
+                ]
+            },
+            {
+                'question_text': 'By what percent(%) were salary increases awarded or budgeted for the following in 2024?',
+                'question_type': 'cross_matrix',
+                'is_required': True,
+                'order': 30,
+                'rows': [
+                    'CEO or similar',
+                    'Level 1 - Director or Senior Executive',
+                    'Level 2 - Senior Management',
+                    'Level 3 - Middle Management',
+                    'Level 4 - Junior Management',
+                    'Level 5 - Team Administrator'
+                ],
+                'columns': [
+                    '0 to 2.5%',
+                    '2.6 to 5%',
+                    '5.1 to 7.5%',
+                    '7.6 to 10%',
+                    '>10%',
+                    "Unsure/don't know",
+                    'No salary increases'
+                ]
+            },
+            {
+                'question_text': 'Which benefits apply to each job level? (Select all that apply)',
+                'question_type': 'cross_matrix_checkbox',
+                'is_required': True,
+                'order': 31,
+                'rows': [
+                    'CEO or similar',
+                    'Level 1 - Director or Senior Executive',
+                    'Level 2 - Senior Management',
+                    'Level 3 - Middle Management',
+                    'Level 4 - Junior Management',
+                    'Level 5 - Team Administrator'
+                ],
+                'columns': [
+                    'Private healthcare',
+                    'Company car',
+                    'Bonus',
+                    'Flexible working',
+                    'Remote work',
+                    'Other'
+                ]
+            },
         ]
 
         for question_data in questions_data:

@@ -111,25 +111,11 @@ def submit_survey_response(request, survey_id):
         
         for question_id, answer in responses.items():
             question = get_object_or_404(Question, id=question_id, survey=survey)
-            
             question_response = {
                 'question': question.id,
-                'answer_text': '',
-                'answer_rating': None,
-                'answer_choices': None
+                'answer': answer,
+                'answer_type': question.question_type
             }
-            
-            # Handle different question types
-            if question.question_type in ['text', 'email', 'number']:
-                question_response['answer_text'] = str(answer)
-            elif question.question_type == 'rating':
-                question_response['answer_rating'] = int(answer)
-            elif question.question_type in ['multiple_choice', 'checkbox']:
-                if isinstance(answer, list):
-                    question_response['answer_choices'] = answer
-                else:
-                    question_response['answer_choices'] = [answer]
-            
             response_data['question_responses'].append(question_response)
         
         # Create the survey response

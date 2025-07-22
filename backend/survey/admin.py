@@ -17,7 +17,7 @@ class QuestionAdmin(admin.ModelAdmin):
 
 class QuestionResponseInline(admin.TabularInline):
     model = QuestionResponse
-    readonly_fields = ['question', 'answer_text', 'answer_rating', 'answer_choices', 'created_at']
+    readonly_fields = ['question', 'answer', 'answer_type', 'created_at']
     extra = 0
     can_delete = False
 
@@ -35,21 +35,19 @@ class SurveyResponseAdmin(admin.ModelAdmin):
         email_response = obj.question_responses.filter(
             question__question_type='email'
         ).first()
-        if email_response and email_response.answer_text:
-            return email_response.answer_text
+        if email_response and email_response.answer_type == 'email':
+            return email_response.answer
         return "No email"
     get_email.short_description = 'Email'
-    get_email.admin_order_field = 'question_responses__answer_text'
+    get_email.admin_order_field = 'question_responses__answer'
     
     def get_name(self, obj):
         """Extract name from question responses (assuming first text question might be name)"""
-        # Look for a text question that might be a name field
         name_response = obj.question_responses.filter(
             question__question_type='text'
         ).first()
-        if name_response and name_response.answer_text:
-            # Truncate if too long
-            name = name_response.answer_text.strip()
+        if name_response and name_response.answer_type == 'text':
+            name = str(name_response.answer).strip()
             return name[:30] + '...' if len(name) > 30 else name
         return "No name"
     get_name.short_description = 'Name'
@@ -65,18 +63,20 @@ class SurveyResponseAdmin(admin.ModelAdmin):
 
 @admin.register(QuestionResponse)
 class QuestionResponseAdmin(admin.ModelAdmin):
-    list_display = ['question', 'survey_response', 'get_answer_display', 'created_at']
+    list_display = ['question', 'survey_response', 'get_answer_display', 'answer_type', 'created_at']
     list_filter = ['question__question_type', 'created_at']
-    search_fields = ['question__question_text', 'answer_text']
-    readonly_fields = ['survey_response', 'question', 'answer_text', 'answer_rating', 'answer_choices', 'created_at']
+    search_fields = ['question__question_text', 'answer']
+    readonly_fields = ['survey_response', 'question', 'answer', 'answer_type', 'created_at']
     
     def get_answer_display(self, obj):
-        if obj.answer_text:
-            return obj.answer_text[:50] + '...' if len(obj.answer_text) > 50 else obj.answer_text
-        elif obj.answer_rating:
-            return f"Rating: {obj.answer_rating}"
-        elif obj.answer_choices:
-            return f"Choices: {', '.join(obj.answer_choices)}"
+        if obj.answer_type in ['text', 'email', 'number']:
+            return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
+        elif obj.answer_type == 'rating':
+            return f"Rating: {obj.answer}"
+        elif obj.answer_type in ['multiple_choice', 'checkbox']:
+            if isinstance(obj.answer, list):
+                return f"Choices: {', '.join(map(str, obj.answer))}"
+            return f"Choice: {obj.answer}"
         return "No answer"
     get_answer_display.short_description = 'Answer'
     

@@ -22,14 +22,21 @@ class Question(models.Model):
         ('rating', 'Rating'),
         ('email', 'Email'),
         ('number', 'Number'),
+        ('matrix', 'Matrix'),  # New type for composite/matrix questions
+        ('cross_matrix', 'Cross Matrix'),  # Cross-matrix radio question
+        ('cross_matrix_checkbox', 'Cross Matrix Checkbox'),  # Cross-matrix checkbox question
     ]
     
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='questions')
     question_text = models.TextField()
-    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='text')
+    question_type = models.CharField(max_length=100, choices=QUESTION_TYPES, default='text')
     is_required = models.BooleanField(default=True)
     order = models.IntegerField(default=0)
     options = models.JSONField(blank=True, null=True)  # For multiple choice/checkbox questions
+    section_title = models.CharField(max_length=200, blank=True, null=True)  # For grouping questions into sections
+    subfields = models.JSONField(blank=True, null=True)  # For matrix questions: list of subfield names
+    rows = models.JSONField(blank=True, null=True)  # For matrix_radio: list of row labels
+    columns = models.JSONField(blank=True, null=True)  # For matrix_radio: list of column labels
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -51,13 +58,12 @@ class SurveyResponse(models.Model):
 class QuestionResponse(models.Model):
     survey_response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='question_responses')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    answer_text = models.TextField(blank=True)  # For text, email, number responses
-    answer_rating = models.IntegerField(blank=True, null=True)  # For rating responses
-    answer_choices = models.JSONField(blank=True, null=True)  # For multiple choice/checkbox responses
+    answer = models.JSONField()  # Store any type of answer as JSON
+    answer_type = models.CharField(max_length=100)  # e.g., 'text', 'number', 'choices', etc.
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         unique_together = ['survey_response', 'question']
-    
+
     def __str__(self):
-        return f"Response to {self.question.question_text[:30]}"
+        return f"Response to {self.question.question_text[:30]} ({self.answer_type})"

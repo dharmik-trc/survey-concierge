@@ -1,7 +1,27 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
+  "name": "survey-concierge-frontend",
+  "version": "1.0.0",
+  "description": "Survey Concierge - Professional Survey Platform Frontend",
   "private": true,
+  "author": "Survey Concierge Team",
+  "license": "MIT",
+  "homepage": "http://localhost:3000",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/survey-concierge/platform.git"
+  },
+  "keywords": [
+    "survey",
+    "questionnaire",
+    "feedback",
+    "data-collection",
+    "research",
+    "poll",
+    "form",
+    "nextjs",
+    "react",
+    "typescript"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

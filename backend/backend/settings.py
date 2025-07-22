@@ -61,7 +61,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:4545",
     "http://127.0.0.1:4545",
     "http://frontend:4545",
+    "http://0.0.0.0:4545",
 ]
+
+# For development only: allow all origins
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 
