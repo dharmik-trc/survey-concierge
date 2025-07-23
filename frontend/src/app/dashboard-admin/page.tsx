@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { apiService, SurveyListItem } from "@/lib/api";
+import { apiService, SurveyListItem } from "../../lib/api";
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
