@@ -15,7 +15,28 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       "@": path.resolve(__dirname, "src"),
     };
+    // Increase memory limit for build
+    config.optimization = {
+      ...config.optimization,
+      splitChunks: {
+        chunks: "all",
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          vendor: {
+            name: "vendor",
+            chunks: "all",
+            test: /node_modules/,
+          },
+        },
+      },
+    };
     return config;
+  },
+  // Increase build timeout
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
   },
 };
 
