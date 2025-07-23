@@ -83,7 +83,7 @@ export default function SurveyPage({
     return false;
   };
 
-  const validateRequired = (value: any, questionType: string): boolean => {
+  const validateRequired = (value: any, _questionType: string): boolean => {
     if (Array.isArray(value)) {
       return value.length > 0;
     }
@@ -229,6 +229,7 @@ export default function SurveyPage({
       | number
       | { [subfield: string]: number }
       | { [row: string]: string }
+      | { [row: string]: string[] }
   ) => {
     setResponses((prev) => ({
       ...prev,
@@ -245,8 +246,12 @@ export default function SurveyPage({
     }
   };
 
-  const handleBlur = (questionId: number, value: any, questionType: string) => {
-    const error = validateQuestion(questionId, value, questionType);
+  const handleBlur = (
+    questionId: number,
+    value: any,
+    _questionType: string
+  ) => {
+    const error = validateQuestion(questionId, value, _questionType);
     setValidationErrors((prev) => ({
       ...prev,
       [questionId]: error || "",
@@ -401,9 +406,9 @@ export default function SurveyPage({
             typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
           question.rows.forEach((row) => {
-            if (!Array.isArray(answerObj[row])) answerObj[row] = [];
+            if (!Array.isArray(answerObj[row])) (answerObj as any)[row] = [];
           });
-          sanitizedResponses[qid as string] = answerObj;
+          sanitizedResponses[qid as string] = answerObj as any;
           continue;
         }
         if (question?.question_type === "cross_matrix" && question.rows) {
@@ -1066,7 +1071,7 @@ export default function SurveyPage({
                             }
                             const next = { ...matrixValue, [row]: nextRow };
                             // Ensure all rows are present as arrays
-                            question.rows.forEach((r) => {
+                            question.rows?.forEach((r) => {
                               if (!Array.isArray(next[r])) next[r] = [];
                             });
                             handleResponseChange(

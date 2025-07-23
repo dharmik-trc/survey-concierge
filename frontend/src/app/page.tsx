@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
@@ -26,8 +24,8 @@ export default function Home() {
           Page Not Found
         </h2>
         <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          The page you're looking for doesn't exist. Please check the URL or
-          contact the administrator.
+          The page you&apos;re looking for doesn&apos;t exist. Please check the
+          URL or contact the administrator.
         </p>
         <div className="text-sm text-gray-500">
           <p>Survey Concierge Platform</p>
