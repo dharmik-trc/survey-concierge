@@ -2,10 +2,5 @@
   "buildCommand": "yarn build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "yarn install",
-  "functions": {
-    "app/**/*.tsx": {
-      "runtime": "nodejs18.x"
-    }
-  }
+  "installCommand": "yarn install"
 } 
