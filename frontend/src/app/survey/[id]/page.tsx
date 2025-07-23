@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, use } from "react";
-import { apiService, Survey as SurveyType, Question } from "@/lib/index";
+import { apiService, Survey as SurveyType, Question } from "@/lib";
 import React from "react"; // Added missing import for React
 
 interface SurveyResponse {
