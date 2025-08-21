@@ -14,9 +14,24 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+print("=== DJANGO SETTINGS LOADING ===")
+print(f"Loading Django settings from: {__file__}")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+print(f"BASE_DIR: {BASE_DIR}")
+
+env_file_path = os.path.join(BASE_DIR, '.env')
+print(f"Looking for .env file at: {env_file_path}")
+print(f".env file exists: {os.path.exists(env_file_path)}")
+
+load_dotenv(env_file_path)
+print("dotenv loaded")
+
+# Show environment variables after loading .env
+print(f"Environment variables after dotenv: {list(os.environ.keys())}")
+print(f"DJANGO_SECRET_KEY present: {'DJANGO_SECRET_KEY' in os.environ}")
+print(f"DATABASE_URL present: {'DATABASE_URL' in os.environ}")
 
 
 # Quick-start development settings - unsuitable for production
@@ -94,15 +109,35 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Database configuration
+print("=== DATABASE CONNECTION DEBUG ===")
+print(f"Current working directory: {os.getcwd()}")
+print(f"Environment variables available: {list(os.environ.keys())}")
+
 DATABASE_URL = os.getenv('DATABASE_URL')
+print(f"DATABASE_URL from environment: {DATABASE_URL}")
 
 if DATABASE_URL:
+    print("Using DATABASE_URL from environment")
     # Parse DATABASE_URL for PostgreSQL
     import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
-    }
+    try:
+        parsed_db = dj_database_url.parse(DATABASE_URL)
+        print(f"Parsed database config: {parsed_db}")
+        DATABASES = {
+            'default': parsed_db
+        }
+        print("Database configuration set successfully")
+    except Exception as e:
+        print(f"Error parsing DATABASE_URL: {e}")
+        print("Falling back to SQLite")
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 else:
+    print("No DATABASE_URL found, using SQLite fallback")
     # Fallback to SQLite for local development
     DATABASES = {
         'default': {
@@ -110,6 +145,9 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+print(f"Final DATABASES config: {DATABASES}")
+print("=== END DATABASE DEBUG ===")
 
 
 # Password validation
