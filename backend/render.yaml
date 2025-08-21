@@ -5,12 +5,12 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
-    startCommand: gunicorn backend.wsgi:application
-    postDeployCommand: |
-      cd backend
       python manage.py migrate --noinput
+    startCommand: gunicorn backend.wsgi:application
     envVars:
-      - key: SECRET_KEY
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
         sync: false
       - key: ALLOWED_HOSTS
         value: survey-backend.onrender.com
