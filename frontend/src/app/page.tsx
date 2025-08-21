@@ -1,7 +1,5 @@
 "use client";
 
-import CookieTest from "@/components/CookieTest";
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -14,9 +12,12 @@ export default function Home() {
             Professional survey platform for data collection and insights.
           </p>
         </div>
-
-        {/* Temporary Cookie Test Component - Remove after testing */}
-        <CookieTest />
+        
+        <div className="text-center">
+          <p className="text-gray-500">
+            Navigate to the dashboard to manage surveys or take surveys directly.
+          </p>
+        </div>
       </div>
     </div>
   );
