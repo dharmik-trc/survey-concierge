@@ -3,15 +3,9 @@ services:
     name: survey-backend
     env: python
     buildCommand: |
-      echo "=== BUILD START ==="
-      pip install -r requirements.txt
-      echo "=== DEPENDENCIES INSTALLED ==="
-      python manage.py collectstatic --noinput
-      echo "=== STATIC FILES COLLECTED ==="
-      python manage.py showmigrations
-      echo "=== MIGRATIONS SHOWN ==="
-      python manage.py migrate --noinput --verbosity=2
-      echo "=== MIGRATIONS COMPLETED ==="
+      pip install -r requirements.txt && \
+      python manage.py collectstatic --noinput && \
+      python manage.py migrate --noinput
     startCommand: gunicorn backend.wsgi:application
     envVars:
       - key: DJANGO_SECRET_KEY
