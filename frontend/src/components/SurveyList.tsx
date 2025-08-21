@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { apiService, SurveyListItem } from "@/lib/api";
+import { apiService, SurveyListItem } from "../lib/api";
 
 interface SurveyListProps {
   onSurveySelect: (surveyId: string) => void;

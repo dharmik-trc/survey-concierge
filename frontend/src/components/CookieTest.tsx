@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cookieUtils, CookieData } from "@/lib";
+import { cookieUtils, CookieData } from "../lib";
 
 export default function CookieTest() {
   const [testData, setTestData] = useState<CookieData>({

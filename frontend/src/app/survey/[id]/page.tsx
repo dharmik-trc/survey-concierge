@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, use } from "react";
-import { apiService, Survey as SurveyType, Question } from "@/lib/api";
-import { cookieUtils, CookieData } from "@/lib";
+import { apiService, Survey as SurveyType, Question } from "../../../lib/api";
+import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
 
 interface SurveyResponse {
@@ -1510,8 +1510,8 @@ export default function SurveyPage({
                     {submitting && currentSectionIndex === sections.length - 1
                       ? "Submitting..."
                       : currentSectionIndex === sections.length - 1
-                      ? "Submit Survey"
-                      : "Save & Next"}
+                        ? "Submit Survey"
+                        : "Save & Next"}
                   </button>
                 </div>
               </form>

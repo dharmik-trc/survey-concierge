@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { apiService, Survey as SurveyType, Question } from "@/lib/api";
+import { apiService, Survey as SurveyType, Question } from "../lib/api";
 
 interface SurveyProps {
   surveyId: string;
