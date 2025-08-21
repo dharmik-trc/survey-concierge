@@ -72,41 +72,42 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                     if not is_valid_choice(answer):
                         raise serializers.ValidationError(f"Invalid choice: {answer}")
         elif question.question_type == 'matrix':
-            # Matrix: answer must be a dict with all subfields as numbers
+            # Matrix: answer must be a dict with subfields as numbers
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Matrix answer must be an object with subfields.")
-            if question.subfields:
-                for subfield in question.subfields:
-                    if subfield not in answer:
-                        raise serializers.ValidationError(f"Missing subfield: {subfield}")
-                    if not self._is_valid_number(answer[subfield]):
-                        raise serializers.ValidationError(f"Subfield '{subfield}' must be a number.")
+            if question.subfields and answer:
+                # Only validate subfields that are actually provided
+                for subfield, value in answer.items():
+                    if subfield in question.subfields and value is not None and value != '':
+                        if not self._is_valid_number(value):
+                            raise serializers.ValidationError(f"Subfield '{subfield}' must be a number.")
         elif question.question_type == 'cross_matrix':
-            # Cross matrix: answer must be a dict mapping each row to a valid column
+            # Cross matrix: answer must be a dict mapping rows to columns
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Cross matrix answer must be an object mapping rows to columns.")
-            if question.rows and question.columns:
-                for row in question.rows:
-                    if row not in answer:
-                        raise serializers.ValidationError(f"Missing row: {row}")
-                    if answer[row] not in question.columns:
-                        raise serializers.ValidationError(f"Invalid column for row '{row}': {answer[row]}")
+            if question.rows and question.columns and answer:
+                # Only validate rows that are actually provided
+                for row, value in answer.items():
+                    if row in question.rows and value is not None and value != '':
+                        if value not in question.columns:
+                            raise serializers.ValidationError(f"Invalid column for row '{row}': {value}")
         elif question.question_type == 'cross_matrix_checkbox':
-            # Cross matrix checkbox: answer must be a dict mapping each row to an array of valid columns
+            # Cross matrix checkbox: answer must be a dict mapping rows to arrays of columns
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Cross matrix checkbox answer must be an object mapping rows to arrays of columns.")
-            if question.rows and question.columns:
+            if question.rows and question.columns and answer:
+                # Only validate rows that are actually provided
+                for row, value in answer.items():
+                    if row in question.rows and value is not None:
+                        if not isinstance(value, list):
+                            raise serializers.ValidationError(f"Row '{row}' must be an array of selected columns.")
+                        for col in value:
+                            if col not in question.columns:
+                                raise serializers.ValidationError(f"Invalid column for row '{row}': {col}")
+            # Only check required validation if the question is actually required
+            if question.is_required and question.rows and answer:
                 for row in question.rows:
-                    if row not in answer:
-                        raise serializers.ValidationError(f"Missing row: {row}")
-                    if not isinstance(answer[row], list):
-                        raise serializers.ValidationError(f"Row '{row}' must be an array of selected columns.")
-                    for col in answer[row]:
-                        if col not in question.columns:
-                            raise serializers.ValidationError(f"Invalid column for row '{row}': {col}")
-            if question.is_required and question.rows:
-                for row in question.rows:
-                    if not answer[row] or len(answer[row]) == 0:
+                    if row in answer and (not answer[row] or len(answer[row]) == 0):
                         raise serializers.ValidationError(f"At least one column must be selected for row '{row}'")
         # Check required fields
         if question.is_required:
@@ -117,10 +118,14 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                 if not answer or (isinstance(answer, list) and len(answer) == 0):
                     raise serializers.ValidationError("This field is required")
             elif question.question_type == 'matrix':
-                if not answer or not isinstance(answer, dict) or any(
-                    (v == '' or v is None) for v in answer.values()
-                ):
-                    raise serializers.ValidationError("All subfields are required.")
+                if not answer or not isinstance(answer, dict) or not answer:
+                    raise serializers.ValidationError("This field is required")
+                elif answer and isinstance(answer, dict):
+                    # Check if any provided values are empty (only for required questions)
+                    if any(
+                        (v == '' or v is None) for v in answer.values() if v is not None
+                    ):
+                        raise serializers.ValidationError("All subfields must be filled for required questions.")
             else:
                 if not answer or (isinstance(answer, str) and answer.strip() == ''):
                     raise serializers.ValidationError("This field is required")

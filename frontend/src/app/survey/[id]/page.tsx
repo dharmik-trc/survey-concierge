@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, use } from "react";
 import { apiService, Survey as SurveyType, Question } from "@/lib/api";
+import { cookieUtils, CookieData } from "@/lib";
 import React from "react"; // Added missing import for React
 
 interface SurveyResponse {
@@ -36,9 +37,28 @@ export default function SurveyPage({
   const [otherTexts, setOtherTexts] = useState<{
     [questionId: string]: string;
   }>({});
+  const [showSaveNotification, setShowSaveNotification] = useState(false);
+  const [isRestoringProgress, setIsRestoringProgress] = useState(false);
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
+
+  // Function to show save notification
+  const displaySaveNotification = () => {
+    setShowSaveNotification(true);
+    setTimeout(() => setShowSaveNotification(false), 2000);
+  };
+
+  // Function to clear saved progress and start over
+  const handleClearProgress = () => {
+    cookieUtils.clearSurveyProgress(surveyId);
+    setResponses({});
+    setCurrentSectionIndex(0);
+    setOtherTexts({});
+    setValidationErrors({});
+    setIsRestoringProgress(false);
+    console.log("Cleared survey progress and reset to beginning");
+  };
 
   useEffect(() => {
     // Only make request if we haven't already
@@ -51,6 +71,19 @@ export default function SurveyPage({
         setError(null);
         const data = await apiService.getSurvey(surveyId);
         setSurvey(data);
+
+        // After survey is loaded, check for saved progress in cookies
+        const savedProgress = cookieUtils.getSurveyProgress(surveyId);
+        if (savedProgress) {
+          console.log("Restoring survey progress from cookies:", savedProgress);
+          setResponses(savedProgress.responses);
+          setCurrentSectionIndex(savedProgress.currentSectionIndex);
+          setOtherTexts(savedProgress.otherTexts);
+          setIsRestoringProgress(true);
+        } else {
+          console.log("No saved progress found - starting fresh survey");
+          setIsRestoringProgress(false);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch survey");
       } finally {
@@ -367,17 +400,23 @@ export default function SurveyPage({
           } else {
             // matrix
             const sanitized: { [subfield: string]: number } = {};
+            let hasValidData = false;
             for (const [sub, val] of Object.entries(ans)) {
-              sanitized[sub as string] =
-                typeof val === "number"
-                  ? val
-                  : (typeof val === "string" && val === "") ||
-                    val === undefined ||
-                    val === null
-                  ? 0
-                  : Number(val);
+              if (
+                val !== undefined &&
+                val !== null &&
+                val !== "" &&
+                val !== 0
+              ) {
+                sanitized[sub as string] =
+                  typeof val === "number" ? val : Number(val);
+                hasValidData = true;
+              }
             }
-            sanitizedResponses[qid as string] = sanitized;
+            // Only add matrix response if it has valid data
+            if (hasValidData) {
+              sanitizedResponses[qid as string] = sanitized;
+            }
           }
         } else if (Array.isArray(ans)) {
           // Handle checkbox with 'Other, please specify' as string[] for backend
@@ -405,20 +444,42 @@ export default function SurveyPage({
           const answerObj =
             typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
+          // Only include rows that have actual answers
+          const filteredAnswerObj: { [row: string]: string[] } = {};
           question.rows.forEach((row) => {
-            if (!Array.isArray(answerObj[row])) (answerObj as any)[row] = [];
+            if (
+              answerObj[row] &&
+              Array.isArray(answerObj[row]) &&
+              answerObj[row].length > 0
+            ) {
+              filteredAnswerObj[row] = answerObj[row];
+            }
           });
-          sanitizedResponses[qid as string] = answerObj as any;
+          // Only add if there are actual answers
+          if (Object.keys(filteredAnswerObj).length > 0) {
+            sanitizedResponses[qid as string] = filteredAnswerObj as any;
+          }
           continue;
         }
         if (question?.question_type === "cross_matrix" && question.rows) {
           const answerObj =
             typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
+          // Only include rows that have actual answers
+          const filteredAnswerObj: { [row: string]: string } = {};
           question.rows.forEach((row) => {
-            if (typeof answerObj[row] !== "string") answerObj[row] = "";
+            if (
+              answerObj[row] &&
+              typeof answerObj[row] === "string" &&
+              answerObj[row].trim() !== ""
+            ) {
+              filteredAnswerObj[row] = answerObj[row];
+            }
           });
-          sanitizedResponses[qid as string] = answerObj;
+          // Only add if there are actual answers
+          if (Object.keys(filteredAnswerObj).length > 0) {
+            sanitizedResponses[qid as string] = filteredAnswerObj as any;
+          }
           continue;
         }
       }
@@ -427,12 +488,36 @@ export default function SurveyPage({
         sanitizedResponses
       );
       console.log("Survey submitted successfully:", result);
+
+      // Clear saved progress from cookies after successful submission
+      cookieUtils.clearSurveyProgress(surveyId);
+      console.log(
+        "Cleared survey progress cookies after successful submission"
+      );
+
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit survey:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to submit survey"
-      );
+
+      // Handle different types of errors
+      let errorMessage = "Failed to submit survey";
+
+      if (error instanceof Error) {
+        if (error.message.includes("Missing subfield")) {
+          errorMessage =
+            "Please complete all required fields in the current section before proceeding.";
+        } else if (error.message.includes("This field is required")) {
+          errorMessage =
+            "Please answer all required questions before submitting.";
+        } else if (error.message.includes("Bad Request")) {
+          errorMessage =
+            "There was an issue with your responses. Please check all required fields.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -1156,6 +1241,17 @@ export default function SurveyPage({
 
   const handleNextSection = () => {
     if (currentSectionIndex < sections.length - 1) {
+      // Save current progress to cookies before moving to next section
+      const progressData: CookieData = {
+        responses,
+        currentSectionIndex: currentSectionIndex + 1, // Save the next section index
+        otherTexts,
+        timestamp: Date.now(),
+      };
+      cookieUtils.saveSurveyProgress(surveyId, progressData);
+      console.log("Saved survey progress to cookies:", progressData);
+      displaySaveNotification();
+
       setCurrentSectionIndex((prev) => prev + 1);
     }
   };
@@ -1281,6 +1377,20 @@ export default function SurveyPage({
         </div>
       </header>
 
+      {/* Top-Right Save Notification */}
+      {showSaveNotification && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center animate-fade-in">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="font-medium">Progress saved!</span>
+        </div>
+      )}
+
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
@@ -1290,6 +1400,57 @@ export default function SurveyPage({
                 {survey.title}
               </h1>
               <p className="text-gray-600 text-lg mb-6">{survey.description}</p>
+
+              {/* Resume Progress Notification */}
+              {isRestoringProgress && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg
+                      className="w-5 h-5 text-blue-600 mr-2"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="text-blue-800 text-sm font-medium">
+                      Welcome back! Your previous progress has been restored.
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleClearProgress}
+                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors duration-200"
+                  >
+                    Start Over
+                  </button>
+                </div>
+              )}
+
+              {/* Progress Bar */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Section {currentSectionIndex + 1} of {sections.length}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {Math.round((currentSectionIndex / sections.length) * 100)}%
+                    Complete
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        (currentSectionIndex / sections.length) * 100
+                      }%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
             </div>
 
             {/* Sectioned Questions */}
@@ -1350,7 +1511,7 @@ export default function SurveyPage({
                       ? "Submitting..."
                       : currentSectionIndex === sections.length - 1
                       ? "Submit Survey"
-                      : "Next Section"}
+                      : "Save & Next"}
                   </button>
                 </div>
               </form>
