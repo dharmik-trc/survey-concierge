@@ -6,7 +6,9 @@ services:
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
     startCommand: gunicorn backend.wsgi:application
-    postDeployCommand: python manage.py migrate
+    postDeployCommand: |
+      cd backend
+      python manage.py migrate --noinput
     envVars:
       - key: SECRET_KEY
         sync: false

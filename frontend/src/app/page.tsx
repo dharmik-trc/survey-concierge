@@ -12,10 +12,11 @@ export default function Home() {
             Professional survey platform for data collection and insights.
           </p>
         </div>
-        
+
         <div className="text-center">
           <p className="text-gray-500">
-            Navigate to the dashboard to manage surveys or take surveys directly.
+            Navigate to the dashboard to manage surveys or take surveys
+            directly.
           </p>
         </div>
       </div>
