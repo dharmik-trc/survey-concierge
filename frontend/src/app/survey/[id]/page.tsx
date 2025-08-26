@@ -12,7 +12,7 @@ interface SurveyResponse {
     | string
     | number
     | string[]
-    | { [subfield: string]: number }
+    | { [subfield: string]: number | null }
     | { [row: string]: string };
 }
 
@@ -263,7 +263,7 @@ export default function SurveyPage({
       | string
       | string[]
       | number
-      | { [subfield: string]: number }
+      | { [subfield: string]: number | null }
       | { [row: string]: string }
       | { [row: string]: string[] }
   ) => {
@@ -940,8 +940,10 @@ export default function SurveyPage({
                               value &&
                               typeof value === "object" &&
                               !Array.isArray(value) &&
-                              value[subfield] !== undefined
-                                ? value[subfield]
+                              subfield in value &&
+                              value[subfield] !== null &&
+                              typeof value[subfield] === "number"
+                                ? value[subfield].toString()
                                 : ""
                             }
                             onChange={(e) => {
