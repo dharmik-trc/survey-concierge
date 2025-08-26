@@ -7,14 +7,14 @@ from .models import Survey, Question, SurveyResponse, QuestionResponse
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'question_type', 'is_required', 'order', 'options', 'section_title', 'subfields', 'rows', 'columns']
+        fields = ['id', 'question_text', 'question_type', 'is_required', 'is_dropdown', 'order', 'options', 'section_title', 'subfields', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     
     class Meta:
         model = Survey
-        fields = ['id', 'title', 'description', 'created_at', 'updated_at', 'is_active', 'questions']
+        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'questions']
 
 class SurveyListSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()

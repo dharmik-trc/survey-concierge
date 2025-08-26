@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: survey_postgres_dev
     environment:
       POSTGRES_DB: survey_db
@@ -9,7 +9,7 @@ services:
     ports:
       - "5485:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./.docker-data/postgres:/var/lib/postgresql/data
     expose:
       - "5485"
     restart: unless-stopped
@@ -45,6 +45,3 @@ services:
     environment:
       - NODE_ENV=development
     restart: unless-stopped
-
-volumes:
-  postgres_data:

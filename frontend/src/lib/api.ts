@@ -1,13 +1,15 @@
 // API service for communicating with Django backend
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/api/survey";
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "https://survey-concierge.onrender.com/api/survey";
 
 export interface Question {
   id: number;
   question_text: string;
   question_type: string;
   is_required: boolean;
+  is_dropdown: boolean;
   order: number;
   options?: string[];
   section_title?: string | null;
@@ -20,6 +22,7 @@ export interface Survey {
   id: string;
   title: string;
   description: string;
+  logo_url?: string | null;
   created_at: string;
   updated_at: string;
   is_active: boolean;
@@ -40,7 +43,7 @@ export interface SurveyResponse {
     | string
     | number
     | string[]
-    | { [subfield: string]: number }
+    | { [subfield: string]: number | null }
     | { [row: string]: string }
     | { [row: string]: string[] };
 }

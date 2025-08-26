@@ -92,7 +92,7 @@ survey_platform/
 
    ```bash
    # Run migrations
-   docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate
+   e
 
    # Create superuser (admin/123)
    docker-compose -f docker-compose.dev.yml exec backend python manage.py create_superuser

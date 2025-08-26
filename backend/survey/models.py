@@ -7,6 +7,8 @@ class Survey(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    logo_url = models.URLField(blank=True, null=True, help_text="URL to the logo for this survey")
+    concierge_logo_url = models.URLField(blank=True, null=True, help_text="URL to the Survey Concierge logo for this survey")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -31,6 +33,7 @@ class Question(models.Model):
     question_text = models.TextField()
     question_type = models.CharField(max_length=100, choices=QUESTION_TYPES, default='text')
     is_required = models.BooleanField(default=True)
+    is_dropdown = models.BooleanField(default=False, help_text="For multiple choice questions, use dropdown instead of radio buttons")
     order = models.IntegerField(default=0)
     options = models.JSONField(blank=True, null=True)  # For multiple choice/checkbox questions
     section_title = models.CharField(max_length=200, blank=True, null=True)  # For grouping questions into sections

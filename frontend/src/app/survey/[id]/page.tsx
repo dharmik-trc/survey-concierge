@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, use } from "react";
 import { apiService, Survey as SurveyType, Question } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
+import Logo from "../../../components/Logo";
+import SearchableDropdown from "../../../components/SearchableDropdown";
 
 interface SurveyResponse {
   [questionId: string]:
@@ -103,7 +105,8 @@ export default function SurveyPage({
   const validateNumber = (value: string | number): boolean => {
     console.log("validateNumber called with:", value, "type:", typeof value);
     if (typeof value === "number") {
-      const result = value !== 0;
+      // Allow any number including 0 and negative numbers
+      const result = !isNaN(value) && isFinite(value);
       console.log("Number validation result:", result);
       return result;
     }
@@ -213,7 +216,7 @@ export default function SurveyPage({
           return "Please enter values for all subfields";
         }
         for (const subfield in value) {
-          if (typeof value[subfield] !== "number" || value[subfield] < 0) {
+          if (typeof value[subfield] !== "number") {
             console.log(
               `Question ${questionId} matrix subfield ${subfield} validation failed:`,
               value[subfield]
@@ -523,20 +526,6 @@ export default function SurveyPage({
     }
   };
 
-  const isCurrentQuestionAnswered = () => {
-    if (!survey) return false;
-    const currentQuestion = survey.questions[currentQuestionIndex];
-    const response = responses[currentQuestion.id];
-
-    if (currentQuestion.is_required) {
-      if (Array.isArray(response)) {
-        return response.length > 0;
-      }
-      return response !== undefined && response !== "" && response !== 0;
-    }
-    return true; // Optional questions are always considered "answered"
-  };
-
   const renderQuestion = (question: Question) => {
     const value = responses[question.id];
     const error = validationErrors[question.id];
@@ -621,12 +610,13 @@ export default function SurveyPage({
           <div>
             <input
               type="number"
+              step="any"
               className={inputClasses}
-              placeholder="Enter a number..."
+              placeholder="Enter a number (positive or negative)..."
               value={(value as number) || ""}
               onChange={(e) => {
                 const numValue =
-                  e.target.value === "" ? 0 : parseInt(e.target.value) || 0;
+                  e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
                 handleResponseChange(question.id, numValue);
               }}
               onBlur={(e) =>
@@ -698,6 +688,44 @@ export default function SurveyPage({
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
           setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
+
+        // Use searchable dropdown if admin marked question as dropdown
+        if (question.is_dropdown) {
+          return (
+            <div>
+              <SearchableDropdown
+                value={typeof value === "string" ? value : ""}
+                onChange={(selectedValue: string) =>
+                  handleResponseChange(question.id, selectedValue)
+                }
+                onBlur={() =>
+                  handleBlur(question.id, value, question.question_type)
+                }
+                options={question.options || []}
+                placeholder="Select an option..."
+                className="w-full"
+              />
+              {error && (
+                <p className="text-red-500 text-sm mt-2 flex items-center">
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        }
+
+        // Use radio buttons for non-ordinal questions
         const optionPairs = chunkArray(question.options || [], 2);
         return (
           <div>
@@ -759,7 +787,7 @@ export default function SurveyPage({
                 >
                   <path
                     fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    d="M18 10a8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                     clipRule="evenodd"
                   />
                 </svg>
@@ -907,7 +935,7 @@ export default function SurveyPage({
                           <input
                             type="number"
                             className={inputClasses}
-                            placeholder={`Enter amount for ${subfield}`}
+                            placeholder={`Amount for ${subfield}`}
                             value={
                               value &&
                               typeof value === "object" &&
@@ -919,24 +947,24 @@ export default function SurveyPage({
                             onChange={(e) => {
                               const numValue =
                                 e.target.value === ""
-                                  ? 0
-                                  : Number(e.target.value);
+                                  ? null
+                                  : parseFloat(e.target.value);
                               const prev =
                                 typeof value === "object" &&
                                 !Array.isArray(value) &&
                                 value
                                   ? value
                                   : {};
-                              const filteredPrev: { [sub: string]: number } =
-                                Object.fromEntries(
-                                  Object.entries(prev).filter(
-                                    ([, v]) => typeof v === "number"
-                                  )
-                                );
-                              const next: { [sub: string]: number } = {
+                              const filteredPrev: {
+                                [sub: string]: number | null;
+                              } = Object.fromEntries(
+                                Object.entries(prev).filter(
+                                  ([, v]) => v !== null && v !== ""
+                                )
+                              );
+                              const next: { [sub: string]: number | null } = {
                                 ...filteredPrev,
-                                [subfield]:
-                                  typeof numValue === "number" ? numValue : 0,
+                                [subfield]: numValue,
                               };
                               // Only recalculate and include the total if isAutoSum
                               if (isAutoSum) {
@@ -947,7 +975,10 @@ export default function SurveyPage({
                                   .reduce((sum, sf) => {
                                     const v = next[sf];
                                     return (
-                                      sum + (typeof v === "number" ? v : 0)
+                                      sum +
+                                      (typeof v === "number" && v !== null
+                                        ? v
+                                        : 0)
                                     );
                                   }, 0);
                                 next[totalField] = total;
@@ -957,24 +988,24 @@ export default function SurveyPage({
                             onBlur={(e) => {
                               const numValue =
                                 e.target.value === ""
-                                  ? 0
-                                  : Number(e.target.value);
+                                  ? null
+                                  : parseFloat(e.target.value);
                               const prev =
                                 typeof value === "object" &&
                                 !Array.isArray(value) &&
                                 value
                                   ? value
                                   : {};
-                              const filteredPrev: { [sub: string]: number } =
-                                Object.fromEntries(
-                                  Object.entries(prev).filter(
-                                    ([, v]) => typeof v === "number"
-                                  )
-                                );
-                              const next: { [sub: string]: number } = {
+                              const filteredPrev: {
+                                [sub: string]: number | null;
+                              } = Object.fromEntries(
+                                Object.entries(prev).filter(
+                                  ([, v]) => v !== null && v !== ""
+                                )
+                              );
+                              const next: { [sub: string]: number | null } = {
                                 ...filteredPrev,
-                                [subfield]:
-                                  typeof numValue === "number" ? numValue : 0,
+                                [subfield]: numValue,
                               };
                               if (isAutoSum) {
                                 const totalField =
@@ -984,7 +1015,10 @@ export default function SurveyPage({
                                   .reduce((sum, sf) => {
                                     const v = next[sf];
                                     return (
-                                      sum + (typeof v === "number" ? v : 0)
+                                      sum +
+                                      (typeof v === "number" && v !== null
+                                        ? v
+                                        : 0)
                                     );
                                   }, 0);
                                 next[totalField] = total;
@@ -1364,8 +1398,12 @@ export default function SurveyPage({
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center">
-            <div>
+          <div className="flex items-center justify-between">
+            {/* Logo on the left */}
+            <Logo size="md" tafSrc={survey?.logo_url} />
+
+            {/* Survey info on the right */}
+            <div className="text-right">
               <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 Survey Concierge
               </h1>
@@ -1394,12 +1432,14 @@ export default function SurveyPage({
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            {/* Survey Header */}
+            {/* Survey Header with Logo */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                {survey.title}
-              </h1>
-              <p className="text-gray-600 text-lg mb-6">{survey.description}</p>
+              <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-3">
+                  {survey.title}
+                </h1>
+                <p className="text-gray-600 text-lg">{survey.description}</p>
+              </div>
 
               {/* Resume Progress Notification */}
               {isRestoringProgress && (
@@ -1433,7 +1473,7 @@ export default function SurveyPage({
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700">
-                    Section {currentSectionIndex + 1} of {sections.length}
+                    Question {currentSectionIndex + 1} of {sections.length}
                   </span>
                   <span className="text-sm text-gray-500">
                     {Math.round((currentSectionIndex / sections.length) * 100)}%
@@ -1459,7 +1499,7 @@ export default function SurveyPage({
                 <div className="mb-8">
                   {sections[currentSectionIndex].title.toLowerCase() !==
                     "other" && (
-                    <h2 className="text-2xl font-semibold text-indigo-700 mb-6">
+                    <h2 className="text-gray-600 text-lg mb-6">
                       {sections[currentSectionIndex].title}
                     </h2>
                   )}

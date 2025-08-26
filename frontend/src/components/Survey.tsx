@@ -56,7 +56,6 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
   const handleSubmit = async () => {
     setSubmitting(true);
     // Here you would typically send the responses to your backend
-    console.log("Survey responses:", responses);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));

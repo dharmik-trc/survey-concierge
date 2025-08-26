@@ -169,3 +169,5 @@ celerybeat-schedule
 .mypy_cache/
 .dmypy.json
 dmypy.json 
+
+.docker-data/
