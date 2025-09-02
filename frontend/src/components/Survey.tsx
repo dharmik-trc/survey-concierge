@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { apiService, Survey as SurveyType, Question } from "../lib/api";
+import {
+  apiService,
+  Survey as SurveyType,
+  Question,
+  optionUtils,
+} from "../lib/api";
 
 interface SurveyProps {
   surveyId: string;
@@ -124,10 +129,81 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
           </div>
         );
 
+      case "scale":
+        const scaleLabels = optionUtils.getScaleLabels(question);
+        const exclusionOptions = optionUtils.getScaleExclusions(question);
+        const isExclusionSelected = exclusionOptions.some(
+          (opt: string) => value === opt
+        );
+
+        return (
+          <div className="space-y-4">
+            {/* Scale Section */}
+            <div
+              className={`transition-opacity duration-300 ${isExclusionSelected ? "opacity-50" : "opacity-100"}`}
+            >
+              <div className="flex justify-between text-sm text-gray-600 mb-3">
+                <span>{scaleLabels[0]}</span>
+                <span>{scaleLabels[1]}</span>
+              </div>
+              <div className="flex gap-2 justify-between">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    disabled={isExclusionSelected}
+                    className={`flex-1 h-10 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold ${
+                      value === rating
+                        ? "bg-blue-500 border-blue-500 text-white"
+                        : "border-gray-300 hover:border-blue-300 text-gray-600"
+                    } ${isExclusionSelected ? "cursor-not-allowed" : "cursor-pointer"}`}
+                    onClick={() => handleResponseChange(question.id, rating)}
+                  >
+                    {rating}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Exclusion Options */}
+            <div className="border-t pt-3">
+              <p className="text-sm text-gray-600 mb-2">
+                Or select one of the following:
+              </p>
+              <div className="space-y-1">
+                {exclusionOptions.map((option: string) => (
+                  <label
+                    key={option}
+                    className="flex items-center space-x-2 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={value === option}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          handleResponseChange(question.id, option);
+                        } else {
+                          handleResponseChange(question.id, "");
+                        }
+                      }}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-700">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
       case "multiple_choice":
+        // Get randomized options with special handling
+        const randomizedOptions = optionUtils.getRandomizedOptions(
+          question.options || []
+        );
         return (
           <div className="space-y-2">
-            {question.options?.map((option, index) => (
+            {randomizedOptions.map((option, index) => (
               <label
                 key={index}
                 className="flex items-center space-x-2 cursor-pointer"

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, use } from "react";
-import { apiService, Survey as SurveyType, Question } from "../../../lib/api";
+import {
+  apiService,
+  Survey as SurveyType,
+  Question,
+  optionUtils,
+} from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
 import Logo from "../../../components/Logo";
@@ -680,8 +685,97 @@ export default function SurveyPage({
           </div>
         );
 
+      case "scale": {
+        const scaleLabels = optionUtils.getScaleLabels(question);
+        const exclusionOptions = optionUtils.getScaleExclusions(question);
+        const isExclusionSelected = exclusionOptions.some(
+          (opt: string) => value === opt
+        );
+
+        return (
+          <div className="space-y-6">
+            {/* Scale Section */}
+            <div
+              className={`transition-opacity duration-300 ${isExclusionSelected ? "opacity-50" : "opacity-100"}`}
+            >
+              <div className="flex justify-between text-sm text-gray-600 mb-4">
+                <span>{scaleLabels[0]}</span>
+                <span>{scaleLabels[1]}</span>
+              </div>
+              <div className="flex gap-2 justify-between">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    disabled={isExclusionSelected}
+                    className={`flex-1 h-12 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold ${
+                      value === rating
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-600 text-white shadow-lg"
+                        : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50 text-gray-600"
+                    } ${isExclusionSelected ? "cursor-not-allowed" : "cursor-pointer"}`}
+                    onClick={() => handleResponseChange(question.id, rating)}
+                  >
+                    {rating}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Exclusion Options */}
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600 mb-3">
+                Or select one of the following:
+              </p>
+              <div className="space-y-2">
+                {exclusionOptions.map((option: string) => (
+                  <label
+                    key={option}
+                    className="flex items-center space-x-2 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={value === option}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          handleResponseChange(question.id, option);
+                        } else {
+                          handleResponseChange(question.id, "");
+                        }
+                      }}
+                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span className="text-gray-700">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-red-500 text-sm mt-2 flex items-center">
+                <svg
+                  className="w-4 h-4 mr-1"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {error}
+              </p>
+            )}
+          </div>
+        );
+      }
+
       case "multiple_choice": {
-        const otherOption = question.options?.find((opt) =>
+        // Get randomized options with special handling
+        const randomizedOptions = optionUtils.getRandomizedOptions(
+          question.options || []
+        );
+        const otherOption = randomizedOptions.find((opt) =>
           opt.toLowerCase().includes("other")
         );
         const isOtherSelected = value === otherOption;
@@ -701,7 +795,7 @@ export default function SurveyPage({
                 onBlur={() =>
                   handleBlur(question.id, value, question.question_type)
                 }
-                options={question.options || []}
+                options={randomizedOptions}
                 placeholder="Select an option..."
                 className="w-full"
               />
@@ -714,7 +808,7 @@ export default function SurveyPage({
                   >
                     <path
                       fillRule="evenodd"
-                      d="M18 10a8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                       clipRule="evenodd"
                     />
                   </svg>
@@ -725,8 +819,8 @@ export default function SurveyPage({
           );
         }
 
-        // Use radio buttons for non-ordinal questions
-        const optionPairs = chunkArray(question.options || [], 2);
+        // Use radio buttons for non-dropdown questions
+        const optionPairs = chunkArray(randomizedOptions, 2);
         return (
           <div>
             <div className="space-y-3">
@@ -787,7 +881,7 @@ export default function SurveyPage({
                 >
                   <path
                     fillRule="evenodd"
-                    d="M18 10a8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                     clipRule="evenodd"
                   />
                 </svg>

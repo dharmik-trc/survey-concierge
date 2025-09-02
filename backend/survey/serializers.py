@@ -91,6 +91,19 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                     if row in question.rows and value is not None and value != '':
                         if value not in question.columns:
                             raise serializers.ValidationError(f"Invalid column for row '{row}': {value}")
+        elif question.question_type == 'scale':
+            # Scale: answer can be a number (1-5) or an exclusion string
+            if answer is not None:
+                if isinstance(answer, int):
+                    if answer < 1 or answer > 5:
+                        raise serializers.ValidationError("Scale value must be between 1 and 5")
+                elif isinstance(answer, str):
+                    # Check if it's a valid exclusion option
+                    exclusion_options = ['Not applicable', 'Don\'t know', 'Did not recruit']
+                    if answer not in exclusion_options:
+                        raise serializers.ValidationError(f"Invalid exclusion option: {answer}")
+                else:
+                    raise serializers.ValidationError("Scale answer must be a number (1-5) or exclusion string")
         elif question.question_type == 'cross_matrix_checkbox':
             # Cross matrix checkbox: answer must be a dict mapping rows to arrays of columns
             if not isinstance(answer, dict):
@@ -116,6 +129,9 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError("This field is required")
             elif question.question_type in ['multiple_choice', 'checkbox']:
                 if not answer or (isinstance(answer, list) and len(answer) == 0):
+                    raise serializers.ValidationError("This field is required")
+            elif question.question_type == 'scale':
+                if answer is None or answer == '':
                     raise serializers.ValidationError("This field is required")
             elif question.question_type == 'matrix':
                 if not answer or not isinstance(answer, dict) or not answer:

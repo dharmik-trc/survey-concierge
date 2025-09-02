@@ -1,8 +1,7 @@
 // API service for communicating with Django backend
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "https://survey-concierge.onrender.com/api/survey";
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:9000/api/survey";
 
 export interface Question {
   id: number;
@@ -16,6 +15,8 @@ export interface Question {
   subfields?: string[];
   rows?: string[];
   columns?: string[];
+  scale_labels?: string[]; // For scale questions: [left_label, right_label]
+  scale_exclusions?: string[]; // For scale questions: options to exclude (e.g., "Not applicable")
 }
 
 export interface Survey {
@@ -121,3 +122,86 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+
+// Simplified utility functions for option handling
+export const optionUtils = {
+  /**
+   * Simple randomization that excludes special options
+   */
+  getRandomizedOptions: (options: string[]): string[] => {
+    if (!options || options.length === 0) return options;
+
+    // Simple exclusions - no need to store these
+    const specialOptions = ["other", "don't know", "none"];
+
+    // Separate regular and special options
+    const regular = options.filter(
+      (opt) =>
+        !specialOptions.some((special) => opt.toLowerCase().includes(special))
+    );
+    const special = options.filter((opt) =>
+      specialOptions.some((special) => opt.toLowerCase().includes(special))
+    );
+
+    // Randomize regular options only
+    const shuffled = [...regular].sort(() => Math.random() - 0.5);
+
+    // Keep special options at the end
+    return [...shuffled, ...special];
+  },
+
+  /**
+   * Simple check for exclusive options
+   */
+  isExclusiveOption: (option: string): boolean => {
+    return (
+      option.toLowerCase().includes("don't know") ||
+      option.toLowerCase().includes("none")
+    );
+  },
+
+  /**
+   * Check if a question should be rendered as a scale
+   */
+  shouldRenderAsScale: (question: Question): boolean => {
+    return (
+      question.question_type === "scale" ||
+      (question.question_type === "multiple_choice" &&
+        question.options &&
+        question.options.length === 5 &&
+        question.question_text.toLowerCase().includes("experience")) ||
+      false
+    );
+  },
+
+  /**
+   * Get scale labels for a question
+   */
+  getScaleLabels: (question: Question): [string, string] => {
+    if (question.scale_labels && question.scale_labels.length >= 2) {
+      return [question.scale_labels[0], question.scale_labels[1]];
+    }
+
+    // Default labels based on question content
+    if (question.question_text.toLowerCase().includes("recruitment")) {
+      return ["Much harder", "Much easier"];
+    }
+    if (question.question_text.toLowerCase().includes("experience")) {
+      return ["Much worse", "Much better"];
+    }
+
+    return ["Strongly disagree", "Strongly agree"];
+  },
+
+  /**
+   * Get exclusion options for scale questions
+   */
+  getScaleExclusions: (question: Question): string[] => {
+    if (question.scale_exclusions) {
+      return question.scale_exclusions;
+    }
+
+    // Default exclusions
+    return ["Not applicable", "Don't know", "Did not recruit"];
+  },
+};

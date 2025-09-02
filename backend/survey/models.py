@@ -27,6 +27,7 @@ class Question(models.Model):
         ('matrix', 'Matrix'),  # New type for composite/matrix questions
         ('cross_matrix', 'Cross Matrix'),  # Cross-matrix radio question
         ('cross_matrix_checkbox', 'Cross Matrix Checkbox'),  # Cross-matrix checkbox question
+        ('scale', 'Scale'),  # 5-point scale with special options
     ]
     
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='questions')
@@ -59,6 +60,7 @@ class SurveyResponse(models.Model):
         return f"Response to {self.survey.title} - {self.submitted_at}"
 
 class QuestionResponse(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     survey_response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='question_responses')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answer = models.JSONField()  # Store any type of answer as JSON
