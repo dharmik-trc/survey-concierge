@@ -176,17 +176,17 @@ export const optionUtils = {
   },
 
   /**
-   * Organize options into columns (up to 3 per column, balanced when splitting)
+   * Organize options into columns (up to 6 per column, balanced when splitting)
    */
   organizeOptionsIntoColumns: (
     options: string[],
-    maxPerColumn: number = 3
+    maxPerColumn: number = 6
   ): string[][] => {
     if (options.length <= maxPerColumn) {
-      return [options]; // Single column for 3 or fewer options
+      return [options]; // Single column for 6 or fewer options
     }
 
-    // For 4 or more options, split into 2 balanced columns
+    // For 7 or more options, split into 2 balanced columns
     const midPoint = Math.ceil(options.length / 2);
     return [options.slice(0, midPoint), options.slice(midPoint)];
   },
@@ -222,6 +222,6 @@ export const optionUtils = {
     }
 
     // Default exclusions
-    return ["Not applicable", "Don't know", "Did not recruit"];
+    return ["Not applicable", "Don't know"];
   },
 };

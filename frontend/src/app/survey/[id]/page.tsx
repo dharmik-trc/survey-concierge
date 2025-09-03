@@ -623,7 +623,7 @@ export default function SurveyPage({
     const value = responses[question.id];
     const error = validationErrors[question.id];
 
-    const inputClasses = `w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 ${
+    const inputClasses = `w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-sm sm:text-base ${
       error
         ? "border-red-500 focus:ring-red-500 focus:border-red-500"
         : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
@@ -738,12 +738,12 @@ export default function SurveyPage({
       case "rating":
         return (
           <div>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-2 sm:gap-3 justify-center">
               {[1, 2, 3, 4, 5].map((rating) => (
                 <button
                   key={rating}
                   type="button"
-                  className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold ${
+                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold text-sm sm:text-base ${
                     value === rating
                       ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-600 text-white shadow-lg"
                       : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50 text-gray-600"
@@ -790,13 +790,13 @@ export default function SurveyPage({
                 <span>{scaleLabels[0]}</span>
                 <span>{scaleLabels[1]}</span>
               </div>
-              <div className="flex gap-2 justify-between">
+              <div className="flex gap-1 sm:gap-2 justify-between">
                 {[1, 2, 3, 4, 5].map((rating) => (
                   <button
                     key={rating}
                     type="button"
                     disabled={isExclusionSelected}
-                    className={`flex-1 h-12 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold ${
+                    className={`flex-1 h-10 sm:h-12 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold text-sm sm:text-base ${
                       value === rating
                         ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-600 text-white shadow-lg"
                         : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50 text-gray-600"
@@ -908,17 +908,16 @@ export default function SurveyPage({
         // Standard layout for all multiple choice questions
         const columns =
           optionUtils.organizeOptionsIntoColumns(randomizedOptions);
-        optionUtils.organizeOptionsIntoColumns(randomizedOptions);
 
         if (columns.length === 1) {
-          // Single row layout for better space utilization
+          // Single column layout - one option below the other
           return (
             <div>
-              <div className="flex gap-4 flex-wrap">
+              <div className="space-y-3">
                 {columns[0].map((option) => (
                   <label
                     key={option}
-                    className="flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                    className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
                   >
                     <input
                       type="radio"
@@ -941,7 +940,7 @@ export default function SurveyPage({
                       }
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
-                    <span className="ml-3 text-gray-700 font-medium">
+                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
                       {option}
                     </span>
                   </label>
@@ -981,13 +980,13 @@ export default function SurveyPage({
           // Multi-column layout
           return (
             <div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {columns.map((column, colIndex) => (
-                  <div key={colIndex} className="space-y-3">
+                  <div key={colIndex} className="space-y-2 sm:space-y-3">
                     {column.map((option) => (
                       <label
                         key={option}
-                        className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                        className="flex items-center p-2 sm:p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
                       >
                         <input
                           type="radio"
@@ -1071,11 +1070,14 @@ export default function SurveyPage({
           <div>
             <div className="space-y-3">
               {optionPairs.map((pair, rowIdx) => (
-                <div key={rowIdx} className="flex gap-4">
+                <div
+                  key={rowIdx}
+                  className="flex flex-col sm:flex-row gap-2 sm:gap-4"
+                >
                   {pair.map((option) => (
                     <label
                       key={option}
-                      className="flex items-center flex-1 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                      className="flex items-center flex-1 p-2 sm:p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
                     >
                       <input
                         type="checkbox"
@@ -1653,20 +1655,25 @@ export default function SurveyPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+    <div
+      style={{
+        background:
+          "linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #faf5ff 100%)",
+      }}
+    >
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             {/* Logo on the left */}
             <Logo size="md" tafSrc={survey?.logo_url} />
 
             {/* Survey info on the right */}
             <div className="text-right">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 Survey Concierge
               </h1>
-              <p className="text-gray-500 text-xs">
+              <p className="text-gray-500 text-xs sm:text-sm">
                 Professional Survey Platform
               </p>
             </div>
@@ -1688,16 +1695,21 @@ export default function SurveyPage({
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+      <div
+        className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8"
+        style={{ paddingBottom: "200px" }}
+      >
+        <div className="max-w-4xl lg:max-w-6xl mx-auto">
+          <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8">
             {/* Survey Header with Logo */}
             <div className="mb-8">
               <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-3">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
                   {survey.title}
                 </h1>
-                <p className="text-gray-600 text-lg">{survey.description}</p>
+                <p className="text-gray-600 text-base sm:text-lg">
+                  {survey.description}
+                </p>
               </div>
 
               {/* Resume Progress Notification */}
@@ -1758,7 +1770,7 @@ export default function SurveyPage({
                 <div className="mb-8">
                   {sections[currentSectionIndex].title.toLowerCase() !==
                     "other" && (
-                    <h2 className="text-gray-600 text-lg mb-6">
+                    <h2 className="text-gray-600 text-base sm:text-lg mb-4 sm:mb-6 font-medium">
                       {sections[currentSectionIndex].title}
                     </h2>
                   )}
@@ -1768,10 +1780,12 @@ export default function SurveyPage({
                       (q) => q.id === question.id
                     );
                     return (
-                      <div key={question.id} className="mb-8">
-                        <div className="mb-2 flex flex-col items-start">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {globalIdx + 1}.{" "}
+                      <div key={question.id} className="mb-6 sm:mb-8 relative">
+                        <div className="mb-3 sm:mb-4 flex flex-col items-start">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 leading-relaxed">
+                            <span className="text-indigo-600 font-bold">
+                              {globalIdx + 1}.
+                            </span>{" "}
                             {question.question_text
                               .split("\n")
                               .map((line, idx) => (
@@ -1782,7 +1796,7 @@ export default function SurveyPage({
                               ))}
                           </h3>
                           {question.is_required && (
-                            <span className="inline-flex items-center mt-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <span className="inline-flex items-center mt-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                               Required
                             </span>
                           )}
@@ -1792,19 +1806,19 @@ export default function SurveyPage({
                     );
                   })}
                 </div>
-                <div className="flex justify-between gap-4">
+                <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
                   <button
                     type="button"
                     onClick={handlePreviousSection}
                     disabled={currentSectionIndex === 0}
-                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium"
+                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-sm sm:text-base"
                   >
                     Previous
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold shadow-sm hover:shadow-md"
+                    className="px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold shadow-sm hover:shadow-md text-sm sm:text-base"
                   >
                     {submitting && currentSectionIndex === sections.length - 1
                       ? "Submitting..."
@@ -1817,6 +1831,21 @@ export default function SurveyPage({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Debug: Force scrollable content */}
+      <div
+        style={{
+          height: "300px",
+          backgroundColor: "#f0f0f0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p style={{ color: "#666", fontSize: "14px" }}>
+          Scroll Test Area - If you can see this, scrolling works!
+        </p>
       </div>
     </div>
   );

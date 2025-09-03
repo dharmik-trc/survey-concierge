@@ -69,13 +69,17 @@ export default function SearchableDropdown({
   const selectedOption = options.find((option) => option === value);
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <div
+      className={`relative ${className}`}
+      ref={dropdownRef}
+      style={{ zIndex: "auto" }}
+    >
       {/* Selected value display */}
       <button
         type="button"
         onClick={handleToggle}
         onBlur={onBlur}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white text-left flex items-center justify-between"
+        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white text-left flex items-center justify-between text-sm sm:text-base"
       >
         <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
           {selectedOption || placeholder}
@@ -99,7 +103,10 @@ export default function SearchableDropdown({
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
+        <div
+          className="absolute z-[9999] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-80 overflow-hidden"
+          style={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+        >
           {/* Search input */}
           <div className="p-3 border-b border-gray-200">
             <input
@@ -107,7 +114,7 @@ export default function SearchableDropdown({
               placeholder="Search options..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900"
               autoFocus
             />
           </div>

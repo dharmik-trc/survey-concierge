@@ -13,7 +13,7 @@ def get_scale_exclusions(question):
         return question.scale_exclusions
     
     # Default exclusions if not defined in database
-    return ['Not applicable', 'Don\'t know', 'Did not recruit']
+    return ['Not applicable', 'Don\'t know']
 
 def get_scale_options(question):
     """
