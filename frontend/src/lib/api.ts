@@ -15,8 +15,8 @@ export interface Question {
   subfields?: string[];
   rows?: string[];
   columns?: string[];
-  scale_labels?: string[]; // For scale questions: [left_label, right_label]
-  scale_exclusions?: string[]; // For scale questions: options to exclude (e.g., "Not applicable")
+  scale_options?: string[]; // For scale questions: list of scale options
+  scale_exclusions?: string[]; // For scale questions: list of exclusion options
 }
 
 export interface Survey {
@@ -44,6 +44,7 @@ export interface SurveyResponse {
     | string
     | number
     | string[]
+    | null
     | { [subfield: string]: number | null }
     | { [row: string]: string }
     | { [row: string]: string[] };
@@ -175,11 +176,30 @@ export const optionUtils = {
   },
 
   /**
+   * Organize options into columns (up to 3 per column, balanced when splitting)
+   */
+  organizeOptionsIntoColumns: (
+    options: string[],
+    maxPerColumn: number = 3
+  ): string[][] => {
+    if (options.length <= maxPerColumn) {
+      return [options]; // Single column for 3 or fewer options
+    }
+
+    // For 4 or more options, split into 2 balanced columns
+    const midPoint = Math.ceil(options.length / 2);
+    return [options.slice(0, midPoint), options.slice(midPoint)];
+  },
+
+  /**
    * Get scale labels for a question
    */
   getScaleLabels: (question: Question): [string, string] => {
-    if (question.scale_labels && question.scale_labels.length >= 2) {
-      return [question.scale_labels[0], question.scale_labels[1]];
+    if (question.scale_options && question.scale_options.length >= 2) {
+      return [
+        question.scale_options[0],
+        question.scale_options[question.scale_options.length - 1],
+      ];
     }
 
     // Default labels based on question content

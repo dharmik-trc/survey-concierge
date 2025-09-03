@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, use } from "react";
+import { useState, useEffect, useRef, use, useMemo } from "react";
 import {
   apiService,
   Survey as SurveyType,
@@ -17,6 +17,7 @@ interface SurveyResponse {
     | string
     | number
     | string[]
+    | null
     | { [subfield: string]: number | null }
     | { [row: string]: string };
 }
@@ -46,9 +47,26 @@ export default function SurveyPage({
   }>({});
   const [showSaveNotification, setShowSaveNotification] = useState(false);
   const [isRestoringProgress, setIsRestoringProgress] = useState(false);
+  const [randomizedOptions, setRandomizedOptions] = useState<{
+    [questionId: string]: string[];
+  }>({});
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
+
+  // Function to get or create randomized options for a question
+  const getRandomizedOptions = (question: Question): string[] => {
+    if (randomizedOptions[question.id]) {
+      return randomizedOptions[question.id];
+    }
+
+    const options = optionUtils.getRandomizedOptions(question.options || []);
+    setRandomizedOptions((prev) => ({
+      ...prev,
+      [question.id]: options,
+    }));
+    return options;
+  };
 
   // Function to show save notification
   const displaySaveNotification = () => {
@@ -124,7 +142,7 @@ export default function SurveyPage({
     return false;
   };
 
-  const validateRequired = (value: any, _questionType: string): boolean => {
+  const validateRequired = (value: any, questionType: string): boolean => {
     if (Array.isArray(value)) {
       return value.length > 0;
     }
@@ -132,6 +150,11 @@ export default function SurveyPage({
       return value.trim() !== "";
     }
     if (typeof value === "number") {
+      // For scale questions, allow 0 as valid (in case someone selects rating 0)
+      // but for other number questions, 0 might be invalid
+      if (questionType === "scale") {
+        return true; // Any number is valid for scale
+      }
       return value !== 0;
     }
     return value !== undefined && value !== null && value !== "";
@@ -200,6 +223,16 @@ export default function SurveyPage({
           );
           return "Please select an option";
         }
+        // Check if "Other" option is selected but no specification is provided
+        const otherOption = question.options?.find((opt) =>
+          opt.toLowerCase().includes("other")
+        );
+        if (value === otherOption && otherOption) {
+          const otherText = otherTexts[questionId] || "";
+          if (!otherText || otherText.trim() === "") {
+            return "Please specify your other option";
+          }
+        }
         break;
 
       case "checkbox":
@@ -209,6 +242,20 @@ export default function SurveyPage({
             value
           );
           return "Please select at least one option";
+        }
+        // Check if "Other" option is selected but no specification is provided
+        const checkboxOtherOption = question.options?.find((opt) =>
+          opt.toLowerCase().includes("other")
+        );
+        if (
+          checkboxOtherOption &&
+          Array.isArray(value) &&
+          value.includes(checkboxOtherOption)
+        ) {
+          const otherText = otherTexts[questionId] || "";
+          if (!otherText || otherText.trim() === "") {
+            return "Please specify your other option";
+          }
         }
         break;
 
@@ -244,6 +291,28 @@ export default function SurveyPage({
         }
         break;
 
+      case "scale":
+        if (
+          question.is_required &&
+          (value === null || value === undefined || value === "")
+        ) {
+          return "This field is required";
+        }
+        if (value !== null && value !== undefined && value !== "") {
+          if (typeof value === "number") {
+            if (value < 1 || value > 5) {
+              return "Please select a rating between 1 and 5";
+            }
+          } else if (typeof value === "string") {
+            // Validate exclusion options
+            const exclusionOptions = optionUtils.getScaleExclusions(question);
+            if (!exclusionOptions.includes(value)) {
+              return "Please select a valid option";
+            }
+          }
+        }
+        break;
+
       case "cross_matrix_checkbox":
         if (!value || typeof value !== "object" || Array.isArray(value)) {
           return "Please answer all rows";
@@ -268,6 +337,7 @@ export default function SurveyPage({
       | string
       | string[]
       | number
+      | null
       | { [subfield: string]: number | null }
       | { [row: string]: string }
       | { [row: string]: string[] }
@@ -391,10 +461,15 @@ export default function SurveyPage({
           );
           if (ans === otherOption) {
             const otherTextValue = otherTexts[qid] || "";
-            sanitizedResponses[qid as string] =
-              otherTextValue && otherTextValue.trim() !== ""
-                ? `Other: ${otherTextValue}`
-                : otherOption;
+            if (otherTextValue && otherTextValue.trim() !== "") {
+              sanitizedResponses[qid as string] = `Other: ${otherTextValue}`;
+            } else {
+              // If "Other" is selected but no text is provided, this should have been caught by validation
+              // But as a safety net, we'll skip this response rather than send incomplete data
+              console.warn(
+                `Skipping incomplete "Other" response for question ${qid}`
+              );
+            }
             continue;
           }
         }
@@ -437,9 +512,22 @@ export default function SurveyPage({
               ? `Other: ${(v as any).other}`
               : v
           );
-          if (otherOption && !newAns.includes(otherOption)) {
-            // Remove empty 'Other' if not filled
-            newAns = newAns.filter((v) => v !== otherOption);
+
+          // Handle "Other" option in checkbox arrays
+          if (otherOption && newAns.includes(otherOption)) {
+            const otherTextValue = otherTexts[qid] || "";
+            if (otherTextValue && otherTextValue.trim() !== "") {
+              // Replace the generic "Other" with the specified text
+              newAns = newAns.map((v) =>
+                v === otherOption ? `Other: ${otherTextValue}` : v
+              );
+            } else {
+              // Remove empty 'Other' if not filled
+              newAns = newAns.filter((v) => v !== otherOption);
+              console.warn(
+                `Removed incomplete "Other" option from checkbox question ${qid}`
+              );
+            }
           }
           sanitizedResponses[qid as string] = newAns;
         } else {
@@ -739,10 +827,10 @@ export default function SurveyPage({
                         if (e.target.checked) {
                           handleResponseChange(question.id, option);
                         } else {
-                          handleResponseChange(question.id, "");
+                          handleResponseChange(question.id, null);
                         }
                       }}
-                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <span className="text-gray-700">{option}</span>
                   </label>
@@ -771,10 +859,8 @@ export default function SurveyPage({
       }
 
       case "multiple_choice": {
-        // Get randomized options with special handling
-        const randomizedOptions = optionUtils.getRandomizedOptions(
-          question.options || []
-        );
+        // Get randomized options with special handling - only randomize once
+        const randomizedOptions = getRandomizedOptions(question);
         const otherOption = randomizedOptions.find((opt) =>
           opt.toLowerCase().includes("other")
         );
@@ -819,49 +905,51 @@ export default function SurveyPage({
           );
         }
 
-        // Use radio buttons for non-dropdown questions
-        const optionPairs = chunkArray(randomizedOptions, 2);
-        return (
-          <div>
-            <div className="space-y-3">
-              {optionPairs.map((pair, rowIdx) => (
-                <div key={rowIdx} className="flex gap-4">
-                  {pair.map((option) => (
-                    <label
-                      key={option}
-                      className="flex items-center flex-1 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
-                    >
-                      <input
-                        type="radio"
-                        name={`question-${question.id}`}
-                        value={option}
-                        checked={
-                          value === option ||
-                          (option === otherOption &&
-                            typeof value === "string" &&
-                            value.startsWith("Other:"))
+        // Standard layout for all multiple choice questions
+        const columns =
+          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+        optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+
+        if (columns.length === 1) {
+          // Single row layout for better space utilization
+          return (
+            <div>
+              <div className="flex gap-4 flex-wrap">
+                {columns[0].map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                  >
+                    <input
+                      type="radio"
+                      name={`question-${question.id}`}
+                      value={option}
+                      checked={
+                        value === option ||
+                        (option === otherOption &&
+                          typeof value === "string" &&
+                          value.startsWith("Other:"))
+                      }
+                      onChange={(e) => {
+                        if (option === otherOption) {
+                          setOtherText("");
                         }
-                        onChange={(e) => {
-                          if (option === otherOption) {
-                            setOtherText("");
-                          }
-                          handleResponseChange(question.id, option);
-                        }}
-                        onBlur={() =>
-                          handleBlur(question.id, value, question.question_type)
-                        }
-                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                      />
-                      <span className="ml-3 text-gray-700 font-medium">
-                        {option}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ))}
+                        handleResponseChange(question.id, option);
+                      }}
+                      onBlur={() =>
+                        handleBlur(question.id, value, question.question_type)
+                      }
+                      className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                    />
+                    <span className="ml-3 text-gray-700 font-medium">
+                      {option}
+                    </span>
+                  </label>
+                ))}
+              </div>
               {/* Show text input if 'Other' is selected */}
               {otherOption && isOtherSelected && (
-                <div className="ml-8 mt-2">
+                <div className="mt-4">
                   <input
                     type="text"
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
@@ -871,25 +959,100 @@ export default function SurveyPage({
                   />
                 </div>
               )}
+              {error && (
+                <p className="text-red-500 text-sm mt-2 flex items-center">
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </p>
+              )}
             </div>
-            {error && (
-              <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
+          );
+        } else {
+          // Multi-column layout
+          return (
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                {columns.map((column, colIndex) => (
+                  <div key={colIndex} className="space-y-3">
+                    {column.map((option) => (
+                      <label
+                        key={option}
+                        className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                      >
+                        <input
+                          type="radio"
+                          name={`question-${question.id}`}
+                          value={option}
+                          checked={
+                            value === option ||
+                            (option === otherOption &&
+                              typeof value === "string" &&
+                              value.startsWith("Other:"))
+                          }
+                          onChange={(e) => {
+                            if (option === otherOption) {
+                              setOtherText("");
+                            }
+                            handleResponseChange(question.id, option);
+                          }}
+                          onBlur={() =>
+                            handleBlur(
+                              question.id,
+                              value,
+                              question.question_type
+                            )
+                          }
+                          className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                        />
+                        <span className="ml-3 text-gray-700 font-medium">
+                          {option}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {/* Show text input if 'Other' is selected */}
+              {otherOption && isOtherSelected && (
+                <div className="mt-4">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
+                    placeholder="Please specify..."
+                    value={otherText}
+                    onChange={(e) => setOtherText(e.target.value)}
                   />
-                </svg>
-                {error}
-              </p>
-            )}
-          </div>
-        );
+                </div>
+              )}
+              {error && (
+                <p className="text-red-500 text-sm mt-2 flex items-center">
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        }
       }
 
       case "checkbox": {
@@ -938,7 +1101,7 @@ export default function SurveyPage({
                         onBlur={() =>
                           handleBlur(question.id, value, question.question_type)
                         }
-                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
                       <span className="ml-3 text-gray-700 font-medium">
                         {option}
@@ -1197,7 +1360,7 @@ export default function SurveyPage({
                             const next = { ...matrixValue, [row]: col };
                             handleResponseChange(question.id, next);
                           }}
-                          className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                         />
                       </td>
                     ))}
@@ -1294,7 +1457,7 @@ export default function SurveyPage({
                               next as unknown as { [row: string]: string[] }
                             );
                           }}
-                          className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                         />
                       </td>
                     ))}

@@ -41,6 +41,11 @@ class Question(models.Model):
     subfields = models.JSONField(blank=True, null=True)  # For matrix questions: list of subfield names
     rows = models.JSONField(blank=True, null=True)  # For matrix_radio: list of row labels
     columns = models.JSONField(blank=True, null=True)  # For matrix_radio: list of column labels
+    
+    # Scale-specific fields
+    scale_options = models.JSONField(blank=True, null=True, help_text="For scale questions: list of scale options (e.g., ['Much harder', 'Harder', 'Same', 'Easier', 'Much easier'])")
+    scale_exclusions = models.JSONField(blank=True, null=True, help_text="For scale questions: list of exclusion options (e.g., ['Not applicable', 'Don't know', 'Did not recruit'])")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:

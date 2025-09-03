@@ -4,10 +4,48 @@ from django.core.exceptions import ValidationError
 import re
 from .models import Survey, Question, SurveyResponse, QuestionResponse
 
+# Utility functions for question handling
+def get_scale_exclusions(question):
+    """
+    Get exclusion options for scale questions from database
+    """
+    if question.scale_exclusions:
+        return question.scale_exclusions
+    
+    # Default exclusions if not defined in database
+    return ['Not applicable', 'Don\'t know', 'Did not recruit']
+
+def get_scale_options(question):
+    """
+    Get scale options for scale questions from database
+    """
+    if question.scale_options:
+        return question.scale_options
+    
+    # Default scale options if not defined in database
+    return ['Much harder', 'Harder', 'Same', 'Easier', 'Much easier']
+
+def get_scale_labels(question):
+    """
+    Get scale labels for scale questions from database
+    """
+    scale_options = get_scale_options(question)
+    if len(scale_options) >= 2:
+        return [scale_options[0], scale_options[-1]]  # First and last options
+    
+    # Fallback to question content-based labels
+    question_text = question.question_text.lower()
+    if 'recruitment' in question_text:
+        return ['Much harder', 'Much easier']
+    if 'experience' in question_text:
+        return ['Much worse', 'Much better']
+    
+    return ['Strongly disagree', 'Strongly agree']
+
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'question_type', 'is_required', 'is_dropdown', 'order', 'options', 'section_title', 'subfields', 'rows', 'columns']
+        fields = ['id', 'question_text', 'question_type', 'is_required', 'is_dropdown', 'order', 'options', 'section_title', 'subfields', 'rows', 'columns', 'scale_options', 'scale_exclusions']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
@@ -61,15 +99,25 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         return True
                     # Allow custom 'Other' values for 'Other, please specify' (legacy string format)
                     if any(opt.lower().startswith('other') for opt in question.options) and str(choice).startswith('Other:'):
+                        # Ensure the "Other:" response has actual content after the colon
+                        other_content = str(choice)[6:].strip()  # Remove "Other:" prefix
+                        if not other_content:
+                            return False  # Invalid if no content after "Other:"
                         return True
                     return False
 
                 if isinstance(answer, list):
                     for choice in answer:
                         if not is_valid_choice(choice):
+                            # Check if it's an empty "Other:" response
+                            if str(choice).startswith('Other:') and str(choice)[6:].strip() == '':
+                                raise serializers.ValidationError("Please specify your 'Other' option")
                             raise serializers.ValidationError(f"Invalid choice: {choice}")
                 else:
                     if not is_valid_choice(answer):
+                        # Check if it's an empty "Other:" response
+                        if str(answer).startswith('Other:') and str(answer)[6:].strip() == '':
+                            raise serializers.ValidationError("Please specify your 'Other' option")
                         raise serializers.ValidationError(f"Invalid choice: {answer}")
         elif question.question_type == 'matrix':
             # Matrix: answer must be a dict with subfields as numbers
@@ -92,14 +140,15 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         if value not in question.columns:
                             raise serializers.ValidationError(f"Invalid column for row '{row}': {value}")
         elif question.question_type == 'scale':
-            # Scale: answer can be a number (1-5) or an exclusion string
-            if answer is not None:
+            # Scale: answer can be a number (1-5), an exclusion string, or null/empty
+            if answer is not None and answer != '':
                 if isinstance(answer, int):
                     if answer < 1 or answer > 5:
                         raise serializers.ValidationError("Scale value must be between 1 and 5")
                 elif isinstance(answer, str):
-                    # Check if it's a valid exclusion option
-                    exclusion_options = ['Not applicable', 'Don\'t know', 'Did not recruit']
+                    # Get exclusion options using utility function
+                    exclusion_options = get_scale_exclusions(question)
+                    
                     if answer not in exclusion_options:
                         raise serializers.ValidationError(f"Invalid exclusion option: {answer}")
                 else:
@@ -131,7 +180,7 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                 if not answer or (isinstance(answer, list) and len(answer) == 0):
                     raise serializers.ValidationError("This field is required")
             elif question.question_type == 'scale':
-                if answer is None or answer == '':
+                if answer is None or answer == '' or answer == 0:
                     raise serializers.ValidationError("This field is required")
             elif question.question_type == 'matrix':
                 if not answer or not isinstance(answer, dict) or not answer:

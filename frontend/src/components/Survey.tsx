@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   apiService,
   Survey as SurveyType,
@@ -23,9 +23,26 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
   const [error, setError] = useState<string | null>(null);
   const [responses, setResponses] = useState<SurveyResponse>({});
   const [submitting, setSubmitting] = useState(false);
+  const [randomizedOptions, setRandomizedOptions] = useState<{
+    [questionId: number]: string[];
+  }>({});
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
+
+  // Function to get or create randomized options for a question
+  const getRandomizedOptions = (question: Question): string[] => {
+    if (randomizedOptions[question.id]) {
+      return randomizedOptions[question.id];
+    }
+
+    const options = optionUtils.getRandomizedOptions(question.options || []);
+    setRandomizedOptions((prev) => ({
+      ...prev,
+      [question.id]: options,
+    }));
+    return options;
+  };
 
   useEffect(() => {
     // Only make request if we haven't already
@@ -197,32 +214,67 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
         );
 
       case "multiple_choice":
-        // Get randomized options with special handling
-        const randomizedOptions = optionUtils.getRandomizedOptions(
-          question.options || []
-        );
-        return (
-          <div className="space-y-2">
-            {randomizedOptions.map((option, index) => (
-              <label
-                key={index}
-                className="flex items-center space-x-2 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name={`question-${question.id}`}
-                  value={option}
-                  checked={value === option}
-                  onChange={(e) =>
-                    handleResponseChange(question.id, e.target.value)
-                  }
-                  className="text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-gray-700">{option}</span>
-              </label>
-            ))}
-          </div>
-        );
+        // Get randomized options with special handling - only randomize once
+        const randomizedOptions = getRandomizedOptions(question);
+
+        // Standard layout for all multiple choice questions
+        const columns =
+          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+        optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+
+        if (columns.length === 1) {
+          // Single row layout for better space utilization
+          return (
+            <div className="flex gap-4 flex-wrap">
+              {columns[0].map((option, index) => (
+                <label
+                  key={index}
+                  className="flex items-center space-x-2 cursor-pointer px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={option}
+                    checked={value === option}
+                    onChange={(e) =>
+                      handleResponseChange(question.id, e.target.value)
+                    }
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          );
+        } else {
+          // Multi-column layout
+          return (
+            <div className="grid grid-cols-2 gap-4">
+              {columns.map((column, colIndex) => (
+                <div key={colIndex} className="space-y-2">
+                  {column.map((option, index) => (
+                    <label
+                      key={index}
+                      className="flex items-center space-x-2 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name={`question-${question.id}`}
+                        value={option}
+                        checked={value === option}
+                        onChange={(e) =>
+                          handleResponseChange(question.id, e.target.value)
+                        }
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-700">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        }
 
       case "checkbox":
         return (
