@@ -1,0 +1,26 @@
+{
+  "name": "Survey Concierge - Professional Survey Platform",
+  "short_name": "Survey Concierge",
+  "description": "Create, manage, and share professional surveys with ease",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4F46E5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["productivity", "business", "education"],
+  "lang": "en",
+  "dir": "ltr"
+} 
