@@ -1832,21 +1832,6 @@ export default function SurveyPage({
           </div>
         </div>
       </div>
-
-      {/* Debug: Force scrollable content */}
-      <div
-        style={{
-          height: "300px",
-          backgroundColor: "#f0f0f0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <p style={{ color: "#666", fontSize: "14px" }}>
-          Scroll Test Area - If you can see this, scrolling works!
-        </p>
-      </div>
     </div>
   );
 }
