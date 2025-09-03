@@ -1666,7 +1666,7 @@ export default function SurveyPage({
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             {/* Logo on the left */}
-            <Logo size="md" tafSrc={survey?.logo_url} />
+            <Logo size="md" logoSrc={survey?.logo_url} />
 
             {/* Survey info on the right */}
             <div className="text-right">

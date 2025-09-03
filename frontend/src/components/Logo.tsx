@@ -4,13 +4,13 @@ import Image from "next/image";
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   className?: string;
-  tafSrc?: string | null; // Optional override, defaults to local logo
+  logoSrc?: string | null; // Optional override, defaults to local logo
 }
 
 export default function Logo({
   size = "md",
   className = "",
-  tafSrc,
+  logoSrc,
 }: LogoProps) {
   const sizePx = {
     sm: 36,
@@ -18,17 +18,19 @@ export default function Logo({
     lg: 72,
   }[size];
 
-  // Use local TAF logo by default, or override with tafSrc if provided
-  const logoSource = tafSrc || "/logos/taf-logo-blue-full.svg";
+  // If no logo source is provided, don't render anything
+  if (!logoSrc) {
+    return null;
+  }
 
   return (
     <div className={`flex items-center space-x-3 ${className}`}>
-      {/* TAF Logo */}
+      {/* Logo */}
       <div className="flex items-center">
         <div className="rounded-lg p-0 mr-2">
           <Image
-            src={logoSource}
-            alt="TAF Logo"
+            src={logoSrc}
+            alt="Logo"
             width={sizePx}
             height={sizePx}
             className="object-contain"
