@@ -6,6 +6,8 @@ import {
   Survey as SurveyType,
   Question,
   optionUtils,
+  OTHER_OPTION,
+  NONE_OPTION,
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
@@ -25,6 +27,64 @@ interface SurveyResponse {
 interface ValidationErrors {
   [questionId: number]: string;
 }
+
+// Validation function for individual subfields
+const validateSubfield = (
+  fieldName: string,
+  value: any,
+  type:
+    | "positive_number"
+    | "negative_number"
+    | "all_numbers"
+    | "email"
+    | "text"
+    | "auto_calculate"
+): string | null => {
+  const stringValue = String(value).trim();
+
+  switch (type) {
+    case "positive_number":
+      const positiveNum = parseFloat(stringValue);
+      if (isNaN(positiveNum) || positiveNum < 0) {
+        return `${fieldName} must be a positive number`;
+      }
+      break;
+
+    case "negative_number":
+      const negativeNum = parseFloat(stringValue);
+      if (isNaN(negativeNum) || negativeNum > 0) {
+        return `${fieldName} must be a negative number`;
+      }
+      break;
+
+    case "all_numbers":
+      const anyNum = parseFloat(stringValue);
+      if (isNaN(anyNum)) {
+        return `${fieldName} must be a valid number`;
+      }
+      break;
+
+    case "email":
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(stringValue)) {
+        return `${fieldName} must be a valid email address`;
+      }
+      break;
+
+    case "text":
+      // Text fields don't need special validation beyond required check
+      break;
+
+    case "auto_calculate":
+      // Auto-calculated fields shouldn't be validated by user input
+      break;
+
+    default:
+      break;
+  }
+
+  return null;
+};
 
 export default function SurveyPage({
   params,
@@ -54,13 +114,13 @@ export default function SurveyPage({
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
 
-  // Function to get or create randomized options for a question
+  // Function to get or create processed options for a question
   const getRandomizedOptions = (question: Question): string[] => {
     if (randomizedOptions[question.id]) {
       return randomizedOptions[question.id];
     }
 
-    const options = optionUtils.getRandomizedOptions(question.options || []);
+    const { options } = optionUtils.getOptionsWithSpecialHandling(question);
     setRandomizedOptions((prev) => ({
       ...prev,
       [question.id]: options,
@@ -206,21 +266,30 @@ export default function SurveyPage({
         }
         break;
 
-      case "rating":
-        if (typeof value !== "number" || value < 1 || value > 5) {
+      case "multiple_choices":
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            console.log(
+              `Question ${questionId} multiple choice validation failed: no options selected`
+            );
+            return "Please select at least one option";
+          }
+        } else if (
+          !value ||
+          (typeof value === "string" && value.trim() === "")
+        ) {
           console.log(
-            `Question ${questionId} rating validation failed:`,
-            value
+            `Question ${questionId} multiple choice validation failed: empty value`
           );
-          return "Please select a rating between 1 and 5";
+          return "Please select at least one option";
         }
         break;
 
-      case "multiple_choice":
+      case "radio":
+      case "dropdown":
+      case "yes_no":
         if (!value || value.trim() === "") {
-          console.log(
-            `Question ${questionId} multiple choice validation failed`
-          );
+          console.log(`Question ${questionId} single choice validation failed`);
           return "Please select an option";
         }
         // Check if "Other" option is selected but no specification is provided
@@ -235,7 +304,7 @@ export default function SurveyPage({
         }
         break;
 
-      case "checkbox":
+      case "fields":
         if (!Array.isArray(value) || value.length === 0) {
           console.log(
             `Question ${questionId} checkbox validation failed:`,
@@ -259,26 +328,55 @@ export default function SurveyPage({
         }
         break;
 
-      case "matrix":
-        if (typeof value !== "object" || Object.keys(value).length === 0) {
+      case "form_fields":
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
           console.log(
-            `Question ${questionId} matrix validation failed:`,
+            `Question ${questionId} form_fields validation failed:`,
             value
           );
           return "Please enter values for all subfields";
         }
-        for (const subfield in value) {
-          if (typeof value[subfield] !== "number") {
-            console.log(
-              `Question ${questionId} matrix subfield ${subfield} validation failed:`,
-              value[subfield]
+
+        // Validate each subfield based on its validation rules
+        if (question.subfields) {
+          for (const subfield of question.subfields) {
+            const fieldValue = value[subfield];
+            const validation = question.subfield_validations?.[subfield];
+
+            // Skip validation for auto-calculated fields
+            if (validation?.type === "auto_calculate") {
+              continue;
+            }
+
+            // Check if required field is empty
+            if (
+              validation?.required !== false &&
+              (!fieldValue || fieldValue === "")
+            ) {
+              return `${subfield} is required`;
+            }
+
+            // Skip validation if field is empty and not required
+            if (!fieldValue || fieldValue === "") {
+              continue;
+            }
+
+            // Validate based on field type
+            const validationType = validation?.type || "all_numbers";
+            const error = validateSubfield(
+              subfield,
+              fieldValue,
+              validationType
             );
-            return `Please enter a valid number for ${subfield}`;
+            if (error) {
+              return error;
+            }
           }
         }
         break;
 
       case "cross_matrix":
+      case "grid_radio":
         if (!value || typeof value !== "object" || Array.isArray(value)) {
           return "Please answer all rows";
         }
@@ -291,29 +389,8 @@ export default function SurveyPage({
         }
         break;
 
-      case "scale":
-        if (
-          question.is_required &&
-          (value === null || value === undefined || value === "")
-        ) {
-          return "This field is required";
-        }
-        if (value !== null && value !== undefined && value !== "") {
-          if (typeof value === "number") {
-            if (value < 1 || value > 5) {
-              return "Please select a rating between 1 and 5";
-            }
-          } else if (typeof value === "string") {
-            // Validate exclusion options
-            const exclusionOptions = optionUtils.getScaleExclusions(question);
-            if (!exclusionOptions.includes(value)) {
-              return "Please select a valid option";
-            }
-          }
-        }
-        break;
-
       case "cross_matrix_checkbox":
+      case "grid_multi":
         if (!value || typeof value !== "object" || Array.isArray(value)) {
           return "Please answer all rows";
         }
@@ -379,7 +456,7 @@ export default function SurveyPage({
     const error = validateQuestion(
       currentQuestion.id,
       currentValue,
-      currentQuestion.question_type
+      currentQuestion.secondary_type || currentQuestion.question_type || "text"
     );
 
     if (error) {
@@ -416,14 +493,14 @@ export default function SurveyPage({
       const value = responses[question.id];
       console.log(`Validating question ${question.id}:`, {
         value,
-        type: question.question_type,
+        type: question.secondary_type || question.question_type,
         required: question.is_required,
       });
 
       const error = validateQuestion(
         question.id,
         value,
-        question.question_type
+        question.secondary_type || question.question_type || "text"
       );
 
       if (error) {
@@ -451,7 +528,7 @@ export default function SurveyPage({
     setSubmitting(true);
     try {
       // Send the responses to the backend
-      // Sanitize matrix answers: ensure all subfields are numbers
+      // Sanitize form_fields answers: ensure proper data types
       const sanitizedResponses: SurveyResponse = {};
       for (const [qid, ans] of Object.entries(responses)) {
         const question = survey?.questions.find((q) => String(q.id) === qid);
@@ -474,15 +551,19 @@ export default function SurveyPage({
           }
         }
         if (ans && typeof ans === "object" && !Array.isArray(ans)) {
-          // cross_matrix or matrix
-          if (
+          // cross_matrix, grid_radio or form_fields
+          const questionType =
             survey?.questions.find((q) => String(q.id) === qid)
-              ?.question_type === "cross_matrix"
+              ?.secondary_type ||
+            survey?.questions.find((q) => String(q.id) === qid)?.question_type;
+          if (
+            questionType === "cross_matrix" ||
+            questionType === "grid_radio"
           ) {
             sanitizedResponses[qid as string] = ans;
-          } else {
-            // matrix
-            const sanitized: { [subfield: string]: number } = {};
+          } else if (questionType === "form_fields") {
+            // form_fields
+            const sanitized: { [subfield: string]: any } = {};
             let hasValidData = false;
             for (const [sub, val] of Object.entries(ans)) {
               if (
@@ -491,12 +572,18 @@ export default function SurveyPage({
                 val !== "" &&
                 val !== 0
               ) {
-                sanitized[sub as string] =
-                  typeof val === "number" ? val : Number(val);
+                // For form_fields, preserve the original data type
+                if (questionType === "form_fields") {
+                  sanitized[sub as string] = val;
+                } else {
+                  // Legacy: convert to number (backward compatibility for old matrix questions)
+                  sanitized[sub as string] =
+                    typeof val === "number" ? val : Number(val);
+                }
                 hasValidData = true;
               }
             }
-            // Only add matrix response if it has valid data
+            // Only add form_fields response if it has valid data
             if (hasValidData) {
               sanitizedResponses[qid as string] = sanitized;
             }
@@ -534,7 +621,9 @@ export default function SurveyPage({
           sanitizedResponses[qid as string] = ans;
         }
         if (
-          question?.question_type === "cross_matrix_checkbox" &&
+          (question?.secondary_type === "cross_matrix_checkbox" ||
+            question?.question_type === "cross_matrix_checkbox" ||
+            question?.secondary_type === "grid_multi") &&
           question.rows
         ) {
           const answerObj =
@@ -557,7 +646,12 @@ export default function SurveyPage({
           }
           continue;
         }
-        if (question?.question_type === "cross_matrix" && question.rows) {
+        if (
+          (question?.secondary_type === "cross_matrix" ||
+            question?.question_type === "cross_matrix" ||
+            question?.secondary_type === "grid_radio") &&
+          question.rows
+        ) {
           const answerObj =
             typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
@@ -629,8 +723,12 @@ export default function SurveyPage({
         : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
     }`;
 
-    switch (question.question_type) {
+    const questionType =
+      question.secondary_type || question.question_type || "text";
+
+    switch (questionType) {
       case "text":
+      case "paragraph":
         return (
           <div>
             <textarea
@@ -642,7 +740,7 @@ export default function SurveyPage({
                 handleResponseChange(question.id, e.target.value)
               }
               onBlur={(e) =>
-                handleBlur(question.id, e.target.value, question.question_type)
+                handleBlur(question.id, e.target.value, questionType)
               }
             />
             {error && (
@@ -676,7 +774,7 @@ export default function SurveyPage({
                 handleResponseChange(question.id, e.target.value)
               }
               onBlur={(e) =>
-                handleBlur(question.id, e.target.value, question.question_type)
+                handleBlur(question.id, e.target.value, questionType)
               }
             />
             {error && (
@@ -713,7 +811,7 @@ export default function SurveyPage({
                 handleResponseChange(question.id, numValue);
               }}
               onBlur={(e) =>
-                handleBlur(question.id, e.target.value, question.question_type)
+                handleBlur(question.id, e.target.value, questionType)
               }
             />
             {error && (
@@ -735,156 +833,300 @@ export default function SurveyPage({
           </div>
         );
 
-      case "rating":
-        return (
-          <div>
-            <div className="flex gap-2 sm:gap-3 justify-center">
-              {[1, 2, 3, 4, 5].map((rating) => (
-                <button
-                  key={rating}
-                  type="button"
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold text-sm sm:text-base ${
-                    value === rating
-                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-600 text-white shadow-lg"
-                      : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50 text-gray-600"
-                  }`}
-                  onClick={() => handleResponseChange(question.id, rating)}
-                >
-                  {rating}
-                </button>
-              ))}
-            </div>
-            {error && (
-              <p className="text-red-500 text-sm mt-2 flex items-center justify-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {error}
-              </p>
-            )}
-          </div>
-        );
-
-      case "scale": {
-        const scaleLabels = optionUtils.getScaleLabels(question);
-        const exclusionOptions = optionUtils.getScaleExclusions(question);
-        const isExclusionSelected = exclusionOptions.some(
-          (opt: string) => value === opt
-        );
-
-        return (
-          <div className="space-y-6">
-            {/* Scale Section */}
-            <div
-              className={`transition-opacity duration-300 ${isExclusionSelected ? "opacity-50" : "opacity-100"}`}
-            >
-              <div className="flex justify-between text-sm text-gray-600 mb-4">
-                <span>{scaleLabels[0]}</span>
-                <span>{scaleLabels[1]}</span>
-              </div>
-              <div className="flex gap-1 sm:gap-2 justify-between">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button
-                    key={rating}
-                    type="button"
-                    disabled={isExclusionSelected}
-                    className={`flex-1 h-10 sm:h-12 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold text-sm sm:text-base ${
-                      value === rating
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-600 text-white shadow-lg"
-                        : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50 text-gray-600"
-                    } ${isExclusionSelected ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    onClick={() => handleResponseChange(question.id, rating)}
-                  >
-                    {rating}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Exclusion Options */}
-            <div className="border-t pt-4">
-              <p className="text-sm text-gray-600 mb-3">
-                Or select one of the following:
-              </p>
-              <div className="space-y-2">
-                {exclusionOptions.map((option: string) => (
-                  <label
-                    key={option}
-                    className="flex items-center space-x-2 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={value === option}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          handleResponseChange(question.id, option);
-                        } else {
-                          handleResponseChange(question.id, null);
-                        }
-                      }}
-                      className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <span className="text-gray-700">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {error}
-              </p>
-            )}
-          </div>
-        );
-      }
-
-      case "multiple_choice": {
-        // Get randomized options with special handling - only randomize once
+      case "multiple_choices": {
+        // Get processed options with special handling
         const randomizedOptions = getRandomizedOptions(question);
-        const otherOption = randomizedOptions.find((opt) =>
-          opt.toLowerCase().includes("other")
-        );
-        const isOtherSelected = value === otherOption;
+        const { hasOtherOption, hasNoneOption } =
+          optionUtils.getOptionsWithSpecialHandling(question);
+
+        const otherOption = OTHER_OPTION;
+        const noneOption = NONE_OPTION;
+        const selectedValues = Array.isArray(value) ? value : [];
+        const isOtherSelected = selectedValues.includes(otherOption);
+        const isNoneSelected = selectedValues.includes(noneOption);
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
           setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
 
-        // Use searchable dropdown if admin marked question as dropdown
-        if (question.is_dropdown) {
+        // Handle checkbox selection with mutual exclusion logic
+        const handleCheckboxChange = (
+          selectedOption: string,
+          isChecked: boolean
+        ) => {
+          let newValues = [...selectedValues];
+
+          if (selectedOption === noneOption) {
+            // If "None of the Above" is checked, clear all other selections
+            if (isChecked) {
+              newValues = [noneOption];
+              setOtherText("");
+            } else {
+              newValues = [];
+            }
+          } else {
+            // If any other option is selected and "None of the Above" was previously selected, remove it
+            if (isNoneSelected) {
+              newValues = newValues.filter((v) => v !== noneOption);
+            }
+
+            if (isChecked) {
+              // Add the option if it's not already there
+              if (!newValues.includes(selectedOption)) {
+                newValues.push(selectedOption);
+              }
+            } else {
+              // Remove the option
+              newValues = newValues.filter((v) => v !== selectedOption);
+              if (selectedOption === otherOption) {
+                setOtherText("");
+              }
+            }
+          }
+
+          handleResponseChange(question.id, newValues);
+        };
+
+        // Standard layout for multiple choice questions (checkboxes)
+        const columns =
+          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+
+        if (columns.length === 1) {
+          // Single column layout - one option below the other
+          return (
+            <div>
+              <div className="space-y-3">
+                {columns[0].map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                  >
+                    <input
+                      type="checkbox"
+                      name={`question-${question.id}`}
+                      value={option}
+                      checked={
+                        selectedValues.includes(option) ||
+                        (option === otherOption &&
+                          selectedValues.some(
+                            (v) =>
+                              typeof v === "string" && v.startsWith("Other:")
+                          ))
+                      }
+                      onChange={(e) =>
+                        handleCheckboxChange(option, e.target.checked)
+                      }
+                      onBlur={() =>
+                        handleBlur(question.id, selectedValues, questionType)
+                      }
+                      className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
+                      {option}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {/* Show text input if 'Other' is selected */}
+              {hasOtherOption && isOtherSelected && (
+                <div className="mt-4">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
+                    placeholder="Please specify..."
+                    value={otherText}
+                    onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        // Update the array to replace "Other (please specify)" with "Other: [text]"
+                        const newValues = selectedValues.filter(
+                          (v) => v !== otherOption
+                        );
+                        newValues.push(`Other: ${otherText.trim()}`);
+                        handleResponseChange(question.id, newValues);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              {error && (
+                <p className="text-red-500 text-sm mt-2 flex items-center">
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        } else {
+          // Two column layout
+          return (
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                {columns.map((column, colIndex) => (
+                  <div key={colIndex} className="space-y-3">
+                    {column.map((option) => (
+                      <label
+                        key={option}
+                        className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                      >
+                        <input
+                          type="checkbox"
+                          name={`question-${question.id}`}
+                          value={option}
+                          checked={
+                            selectedValues.includes(option) ||
+                            (option === otherOption &&
+                              selectedValues.some(
+                                (v) =>
+                                  typeof v === "string" &&
+                                  v.startsWith("Other:")
+                              ))
+                          }
+                          onChange={(e) =>
+                            handleCheckboxChange(option, e.target.checked)
+                          }
+                          onBlur={() =>
+                            handleBlur(
+                              question.id,
+                              selectedValues,
+                              questionType
+                            )
+                          }
+                          className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
+                          {option}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {/* Show text input if 'Other' is selected */}
+              {hasOtherOption && isOtherSelected && (
+                <div className="mt-4">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
+                    placeholder="Please specify..."
+                    value={otherText}
+                    onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        // Update the array to replace "Other (please specify)" with "Other: [text]"
+                        const newValues = selectedValues.filter(
+                          (v) => v !== otherOption
+                        );
+                        newValues.push(`Other: ${otherText.trim()}`);
+                        handleResponseChange(question.id, newValues);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              {error && (
+                <p className="text-red-500 text-sm mt-2 flex items-center">
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </p>
+              )}
+            </div>
+          );
+        }
+      }
+
+      case "radio":
+      case "dropdown":
+      case "yes_no": {
+        // Get processed options with special handling
+        const randomizedOptions = getRandomizedOptions(question);
+        const { hasOtherOption, hasNoneOption } =
+          optionUtils.getOptionsWithSpecialHandling(question);
+
+        const otherOption = OTHER_OPTION;
+        const noneOption = NONE_OPTION;
+        const isOtherSelected = value === otherOption;
+        const isNoneSelected = value === noneOption;
+        const otherText = otherTexts[question.id] || "";
+        const setOtherText = (text: string) =>
+          setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
+
+        // Handle option selection with mutual exclusion logic
+        const handleOptionChange = (selectedOption: string) => {
+          // If "None of the Above" is selected, clear other selections
+          if (selectedOption === noneOption) {
+            handleResponseChange(question.id, noneOption);
+            setOtherText("");
+          }
+          // If any other option is selected and "None of the Above" was previously selected, switch to new option
+          else if (isNoneSelected && selectedOption !== noneOption) {
+            handleResponseChange(question.id, selectedOption);
+            if (selectedOption !== otherOption) {
+              setOtherText("");
+            }
+          }
+          // Normal selection
+          else {
+            handleResponseChange(question.id, selectedOption);
+            if (selectedOption !== otherOption) {
+              setOtherText("");
+            }
+          }
+        };
+
+        // Use searchable dropdown if question type is dropdown
+        if (questionType === "dropdown") {
           return (
             <div>
               <SearchableDropdown
                 value={typeof value === "string" ? value : ""}
                 onChange={(selectedValue: string) =>
-                  handleResponseChange(question.id, selectedValue)
+                  handleOptionChange(selectedValue)
                 }
-                onBlur={() =>
-                  handleBlur(question.id, value, question.question_type)
-                }
+                onBlur={() => handleBlur(question.id, value, questionType)}
                 options={randomizedOptions}
                 placeholder="Select an option..."
                 className="w-full"
               />
+              {/* Show text input if 'Other' is selected */}
+              {hasOtherOption && isOtherSelected && (
+                <div className="mt-4">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
+                    placeholder="Please specify..."
+                    value={otherText}
+                    onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        handleResponseChange(
+                          question.id,
+                          `Other: ${otherText.trim()}`
+                        );
+                      }
+                    }}
+                  />
+                </div>
+              )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
                   <svg
@@ -929,14 +1171,9 @@ export default function SurveyPage({
                           typeof value === "string" &&
                           value.startsWith("Other:"))
                       }
-                      onChange={(e) => {
-                        if (option === otherOption) {
-                          setOtherText("");
-                        }
-                        handleResponseChange(question.id, option);
-                      }}
+                      onChange={(e) => handleOptionChange(option)}
                       onBlur={() =>
-                        handleBlur(question.id, value, question.question_type)
+                        handleBlur(question.id, value, questionType)
                       }
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
@@ -947,7 +1184,7 @@ export default function SurveyPage({
                 ))}
               </div>
               {/* Show text input if 'Other' is selected */}
-              {otherOption && isOtherSelected && (
+              {hasOtherOption && isOtherSelected && (
                 <div className="mt-4">
                   <input
                     type="text"
@@ -955,6 +1192,14 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        handleResponseChange(
+                          question.id,
+                          `Other: ${otherText.trim()}`
+                        );
+                      }
+                    }}
                   />
                 </div>
               )}
@@ -998,17 +1243,14 @@ export default function SurveyPage({
                               typeof value === "string" &&
                               value.startsWith("Other:"))
                           }
-                          onChange={(e) => {
-                            if (option === otherOption) {
-                              setOtherText("");
-                            }
-                            handleResponseChange(question.id, option);
-                          }}
+                          onChange={(e) => handleOptionChange(option)}
                           onBlur={() =>
                             handleBlur(
                               question.id,
                               value,
-                              question.question_type
+                              question.secondary_type ||
+                                question.question_type ||
+                                "text"
                             )
                           }
                           className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
@@ -1022,7 +1264,7 @@ export default function SurveyPage({
                 ))}
               </div>
               {/* Show text input if 'Other' is selected */}
-              {otherOption && isOtherSelected && (
+              {hasOtherOption && isOtherSelected && (
                 <div className="mt-4">
                   <input
                     type="text"
@@ -1030,6 +1272,14 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        handleResponseChange(
+                          question.id,
+                          `Other: ${otherText.trim()}`
+                        );
+                      }
+                    }}
                   />
                 </div>
               )}
@@ -1054,7 +1304,7 @@ export default function SurveyPage({
         }
       }
 
-      case "checkbox": {
+      case "fields": {
         const otherOption = question.options?.find((opt) =>
           opt.toLowerCase().includes("other")
         );
@@ -1101,7 +1351,7 @@ export default function SurveyPage({
                           handleResponseChange(question.id, safeValues);
                         }}
                         onBlur={() =>
-                          handleBlur(question.id, value, question.question_type)
+                          handleBlur(question.id, value, questionType)
                         }
                         className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
@@ -1120,6 +1370,14 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     onChange={(e) => setOtherText(e.target.value)}
+                    onBlur={() => {
+                      if (otherText.trim()) {
+                        handleResponseChange(
+                          question.id,
+                          `Other: ${otherText.trim()}`
+                        );
+                      }
+                    }}
                   />
                 </div>
               )}
@@ -1144,12 +1402,13 @@ export default function SurveyPage({
         );
       }
 
-      case "matrix":
+      case "form_fields":
         if (!question.subfields) return null;
         const subfields = question.subfields;
-        const lastSubfield = subfields[subfields.length - 1];
-        const isAutoSum =
-          lastSubfield && lastSubfield.trim().toLowerCase().startsWith("total");
+        // Check for auto-calculated fields using validation rules
+        const hasAutoCalculate = subfields.some(
+          (sf) => question.subfield_validations?.[sf]?.type === "auto_calculate"
+        );
         return (
           <div>
             <div className="overflow-x-auto">
@@ -1157,19 +1416,31 @@ export default function SurveyPage({
                 <thead>{/* No header row */}</thead>
                 <tbody>
                   {subfields.map((subfield, idx) => {
-                    const isTotal = isAutoSum && idx === subfields.length - 1;
-                    if (isTotal) {
-                      // Calculate total as sum of all previous subfields
-                      const total = subfields.slice(0, -1).reduce((sum, sf) => {
-                        const v =
-                          value &&
-                          typeof value === "object" &&
-                          !Array.isArray(value) &&
-                          value[sf] !== undefined
-                            ? value[sf]
-                            : 0;
-                        return sum + (typeof v === "number" ? v : 0);
-                      }, 0);
+                    const validation =
+                      question.subfield_validations?.[subfield];
+                    const isAutoCalculated =
+                      validation?.type === "auto_calculate";
+
+                    if (isAutoCalculated) {
+                      // Calculate based on formula or default sum
+                      const formula = validation?.formula || "sum_all_previous";
+                      let calculatedValue = 0;
+
+                      if (formula === "sum_all_previous") {
+                        calculatedValue = subfields
+                          .slice(0, idx)
+                          .reduce((sum, sf) => {
+                            const v =
+                              value &&
+                              typeof value === "object" &&
+                              !Array.isArray(value) &&
+                              value[sf] !== undefined
+                                ? value[sf]
+                                : 0;
+                            return sum + (typeof v === "number" ? v : 0);
+                          }, 0);
+                      }
+
                       return (
                         <tr key={subfield}>
                           <td className="px-4 py-2 text-gray-800">
@@ -1179,7 +1450,7 @@ export default function SurveyPage({
                             <input
                               type="number"
                               className={inputClasses + " bg-gray-100"}
-                              value={total}
+                              value={calculatedValue}
                               readOnly
                               tabIndex={-1}
                             />
@@ -1192,57 +1463,83 @@ export default function SurveyPage({
                         <td className="px-4 py-2 text-gray-800">{subfield}</td>
                         <td className="px-4 py-2">
                           <input
-                            type="number"
+                            type={
+                              validation?.type === "email"
+                                ? "email"
+                                : validation?.type?.includes("number")
+                                  ? "number"
+                                  : "text"
+                            }
                             className={inputClasses}
-                            placeholder={`Amount for ${subfield}`}
+                            placeholder={
+                              validation?.type === "email"
+                                ? `Enter email for ${subfield}`
+                                : validation?.type?.includes("number")
+                                  ? `Enter Response`
+                                  : `Enter ${subfield}`
+                            }
                             value={
                               value &&
                               typeof value === "object" &&
                               !Array.isArray(value) &&
                               subfield in value &&
-                              value[subfield] !== null &&
-                              typeof value[subfield] === "number"
-                                ? value[subfield].toString()
+                              value[subfield] !== null
+                                ? String(value[subfield])
                                 : ""
                             }
                             onChange={(e) => {
-                              const numValue =
-                                e.target.value === ""
-                                  ? null
-                                  : parseFloat(e.target.value);
+                              const inputValue = e.target.value;
+                              let processedValue: any;
+
+                              if (inputValue === "") {
+                                processedValue = null;
+                              } else if (validation?.type?.includes("number")) {
+                                processedValue = parseFloat(inputValue);
+                                if (isNaN(processedValue))
+                                  processedValue = null;
+                              } else {
+                                processedValue = inputValue;
+                              }
+
                               const prev =
                                 typeof value === "object" &&
                                 !Array.isArray(value) &&
                                 value
                                   ? value
                                   : {};
-                              const filteredPrev: {
-                                [sub: string]: number | null;
-                              } = Object.fromEntries(
-                                Object.entries(prev).filter(
-                                  ([, v]) => v !== null && v !== ""
-                                )
-                              );
-                              const next: { [sub: string]: number | null } = {
+                              const filteredPrev: { [sub: string]: any } =
+                                Object.fromEntries(
+                                  Object.entries(prev).filter(
+                                    ([, v]) => v !== null && v !== ""
+                                  )
+                                );
+                              const next: { [sub: string]: any } = {
                                 ...filteredPrev,
-                                [subfield]: numValue,
+                                [subfield]: processedValue,
                               };
-                              // Only recalculate and include the total if isAutoSum
-                              if (isAutoSum) {
-                                const totalField =
-                                  subfields[subfields.length - 1];
-                                const total = subfields
-                                  .slice(0, -1)
-                                  .reduce((sum, sf) => {
-                                    const v = next[sf];
-                                    return (
-                                      sum +
-                                      (typeof v === "number" && v !== null
-                                        ? v
-                                        : 0)
-                                    );
-                                  }, 0);
-                                next[totalField] = total;
+                              // Only recalculate and include the total if hasAutoCalculate
+                              if (hasAutoCalculate) {
+                                const totalField = subfields.find(
+                                  (sf) =>
+                                    question.subfield_validations?.[sf]
+                                      ?.type === "auto_calculate"
+                                );
+                                if (totalField) {
+                                  const totalFieldIndex =
+                                    subfields.indexOf(totalField);
+                                  const total = subfields
+                                    .slice(0, totalFieldIndex)
+                                    .reduce((sum, sf) => {
+                                      const v = next[sf];
+                                      return (
+                                        sum +
+                                        (typeof v === "number" && v !== null
+                                          ? v
+                                          : 0)
+                                      );
+                                    }, 0);
+                                  next[totalField] = total;
+                                }
                               }
                               handleResponseChange(question.id, next);
                             }}
@@ -1268,26 +1565,35 @@ export default function SurveyPage({
                                 ...filteredPrev,
                                 [subfield]: numValue,
                               };
-                              if (isAutoSum) {
-                                const totalField =
-                                  subfields[subfields.length - 1];
-                                const total = subfields
-                                  .slice(0, -1)
-                                  .reduce((sum, sf) => {
-                                    const v = next[sf];
-                                    return (
-                                      sum +
-                                      (typeof v === "number" && v !== null
-                                        ? v
-                                        : 0)
-                                    );
-                                  }, 0);
-                                next[totalField] = total;
+                              if (hasAutoCalculate) {
+                                const totalField = subfields.find(
+                                  (sf) =>
+                                    question.subfield_validations?.[sf]
+                                      ?.type === "auto_calculate"
+                                );
+                                if (totalField) {
+                                  const totalFieldIndex =
+                                    subfields.indexOf(totalField);
+                                  const total = subfields
+                                    .slice(0, totalFieldIndex)
+                                    .reduce((sum, sf) => {
+                                      const v = next[sf];
+                                      return (
+                                        sum +
+                                        (typeof v === "number" && v !== null
+                                          ? v
+                                          : 0)
+                                      );
+                                    }, 0);
+                                  next[totalField] = total;
+                                }
                               }
                               handleBlur(
                                 question.id,
                                 next,
-                                question.question_type
+                                question.secondary_type ||
+                                  question.question_type ||
+                                  "text"
                               );
                             }}
                           />
@@ -1317,7 +1623,8 @@ export default function SurveyPage({
           </div>
         );
 
-      case "cross_matrix": {
+      case "cross_matrix":
+      case "grid_radio": {
         if (!question.rows || !question.columns) return null;
         const rawValue = responses[question.id];
         const matrixValue: { [row: string]: string } =
@@ -1390,7 +1697,9 @@ export default function SurveyPage({
         );
       }
 
-      case "cross_matrix_checkbox": {
+      case "cross_matrix_checkbox":
+      case "grid_multi":
+      case "ranking": {
         if (!question.rows || !question.columns) return null;
         const rawValue = responses[question.id];
         // Type guard: only use rawValue if all values are arrays
@@ -1568,7 +1877,7 @@ export default function SurveyPage({
       const error = validateQuestion(
         question.id,
         value,
-        question.question_type
+        question.secondary_type || question.question_type || "text"
       );
       if (error) {
         errors[question.id] = error;

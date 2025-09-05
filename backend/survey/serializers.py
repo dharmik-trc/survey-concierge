@@ -4,48 +4,15 @@ from django.core.exceptions import ValidationError
 import re
 from .models import Survey, Question, SurveyResponse, QuestionResponse
 
-# Utility functions for question handling
-def get_scale_exclusions(question):
-    """
-    Get exclusion options for scale questions from database
-    """
-    if question.scale_exclusions:
-        return question.scale_exclusions
-    
-    # Default exclusions if not defined in database
-    return ['Not applicable', 'Don\'t know']
-
-def get_scale_options(question):
-    """
-    Get scale options for scale questions from database
-    """
-    if question.scale_options:
-        return question.scale_options
-    
-    # Default scale options if not defined in database
-    return ['Much harder', 'Harder', 'Same', 'Easier', 'Much easier']
-
-def get_scale_labels(question):
-    """
-    Get scale labels for scale questions from database
-    """
-    scale_options = get_scale_options(question)
-    if len(scale_options) >= 2:
-        return [scale_options[0], scale_options[-1]]  # First and last options
-    
-    # Fallback to question content-based labels
-    question_text = question.question_text.lower()
-    if 'recruitment' in question_text:
-        return ['Much harder', 'Much easier']
-    if 'experience' in question_text:
-        return ['Much worse', 'Much better']
-    
-    return ['Strongly disagree', 'Strongly agree']
+# Utility functions for question handling (scale functions removed as no longer needed)
 
 class QuestionSerializer(serializers.ModelSerializer):
+    # Include question_type for backward compatibility (it's a property that returns secondary_type)
+    question_type = serializers.ReadOnlyField()
+    
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'question_type', 'is_required', 'is_dropdown', 'order', 'options', 'section_title', 'subfields', 'rows', 'columns', 'scale_options', 'scale_exclusions']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
@@ -79,17 +46,15 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         if not answer_type:
             raise serializers.ValidationError("Answer type is required")
 
-        # Validate based on question type
-        if question.question_type == 'email':
+        # Validate based on question type (using secondary_type)
+        question_type = question.secondary_type
+        if question_type == 'email':
             if answer and not self._is_valid_email(answer):
                 raise serializers.ValidationError("Please enter a valid email address")
-        elif question.question_type == 'number':
+        elif question_type == 'number':
             if answer and not self._is_valid_number(answer):
                 raise serializers.ValidationError("Please enter a valid number")
-        elif question.question_type == 'rating':
-            if answer is not None and (int(answer) < 1 or int(answer) > 5):
-                raise serializers.ValidationError("Rating must be between 1 and 5")
-        elif question.question_type in ['multiple_choice', 'checkbox']:
+        elif question_type in ['multiple_choices', 'radio', 'dropdown', 'yes_no', 'fields']:
             if question.options and answer:
                 def is_valid_choice(choice):
                     if isinstance(choice, dict) and 'other' in choice:
@@ -119,18 +84,32 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         if str(answer).startswith('Other:') and str(answer)[6:].strip() == '':
                             raise serializers.ValidationError("Please specify your 'Other' option")
                         raise serializers.ValidationError(f"Invalid choice: {answer}")
-        elif question.question_type == 'matrix':
-            # Matrix: answer must be a dict with subfields as numbers
+        elif question_type in ['form_fields']:
+            # Form fields: answer must be a dict with subfields, supports different data types
             if not isinstance(answer, dict):
-                raise serializers.ValidationError("Matrix answer must be an object with subfields.")
-            if question.subfields and answer:
-                # Only validate subfields that are actually provided
+                raise serializers.ValidationError("Form fields answer must be an object with subfields.")
+            if question.subfields and question.subfield_validations and answer:
+                # Validate each subfield based on its validation rules
                 for subfield, value in answer.items():
                     if subfield in question.subfields and value is not None and value != '':
-                        if not self._is_valid_number(value):
-                            raise serializers.ValidationError(f"Subfield '{subfield}' must be a number.")
-        elif question.question_type == 'cross_matrix':
-            # Cross matrix: answer must be a dict mapping rows to columns
+                        validation = question.subfield_validations.get(subfield, {})
+                        validation_type = validation.get('type', 'text')
+                        
+                        # Skip validation for auto-calculated fields
+                        if validation_type == 'auto_calculate':
+                            continue
+                            
+                        # Validate based on type
+                        if validation_type in ['positive_number', 'negative_number', 'all_numbers']:
+                            if not self._is_valid_number(value):
+                                raise serializers.ValidationError(f"Subfield '{subfield}' must be a number.")
+                        elif validation_type == 'email':
+                            import re
+                            email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+                            if not re.match(email_regex, str(value)):
+                                raise serializers.ValidationError(f"Subfield '{subfield}' must be a valid email address.")
+        elif question_type in ['cross_matrix', 'grid_radio']:
+            # Cross matrix (single select): answer must be a dict mapping rows to single columns
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Cross matrix answer must be an object mapping rows to columns.")
             if question.rows and question.columns and answer:
@@ -139,21 +118,7 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                     if row in question.rows and value is not None and value != '':
                         if value not in question.columns:
                             raise serializers.ValidationError(f"Invalid column for row '{row}': {value}")
-        elif question.question_type == 'scale':
-            # Scale: answer can be a number (1-5), an exclusion string, or null/empty
-            if answer is not None and answer != '':
-                if isinstance(answer, int):
-                    if answer < 1 or answer > 5:
-                        raise serializers.ValidationError("Scale value must be between 1 and 5")
-                elif isinstance(answer, str):
-                    # Get exclusion options using utility function
-                    exclusion_options = get_scale_exclusions(question)
-                    
-                    if answer not in exclusion_options:
-                        raise serializers.ValidationError(f"Invalid exclusion option: {answer}")
-                else:
-                    raise serializers.ValidationError("Scale answer must be a number (1-5) or exclusion string")
-        elif question.question_type == 'cross_matrix_checkbox':
+        elif question_type in ['cross_matrix_checkbox', 'grid_multi', 'ranking']:
             # Cross matrix checkbox: answer must be a dict mapping rows to arrays of columns
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Cross matrix checkbox answer must be an object mapping rows to arrays of columns.")
@@ -173,16 +138,13 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError(f"At least one column must be selected for row '{row}'")
         # Check required fields
         if question.is_required:
-            if question.question_type == 'rating':
-                if answer is None:
-                    raise serializers.ValidationError("This field is required")
-            elif question.question_type in ['multiple_choice', 'checkbox']:
+            if question_type in ['multiple_choices', 'radio', 'dropdown', 'yes_no', 'fields']:
                 if not answer or (isinstance(answer, list) and len(answer) == 0):
                     raise serializers.ValidationError("This field is required")
-            elif question.question_type == 'scale':
-                if answer is None or answer == '' or answer == 0:
+            elif question_type in ['form_fields']:
+                if not answer or not isinstance(answer, dict) or not answer:
                     raise serializers.ValidationError("This field is required")
-            elif question.question_type == 'matrix':
+            elif question_type in ['grid_radio']:
                 if not answer or not isinstance(answer, dict) or not answer:
                     raise serializers.ValidationError("This field is required")
                 elif answer and isinstance(answer, dict):

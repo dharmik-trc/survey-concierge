@@ -36,7 +36,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
       return randomizedOptions[question.id];
     }
 
-    const options = optionUtils.getRandomizedOptions(question.options || []);
+    const { options } = optionUtils.getOptionsWithSpecialHandling(question);
     setRandomizedOptions((prev) => ({
       ...prev,
       [question.id]: options,
@@ -89,9 +89,22 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
 
   const renderQuestion = (question: Question) => {
     const value = responses[question.id];
+    const questionType =
+      question.secondary_type || question.question_type || "text";
 
-    switch (question.question_type) {
+    switch (questionType) {
       case "text":
+        return (
+          <textarea
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={1}
+            placeholder="Enter your answer..."
+            value={(value as string) || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+          />
+        );
+
+      case "paragraph":
         return (
           <textarea
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -126,101 +139,16 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
           />
         );
 
-      case "rating":
-        return (
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <button
-                key={rating}
-                type="button"
-                className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors ${
-                  value === rating
-                    ? "bg-blue-500 border-blue-500 text-white"
-                    : "border-gray-300 hover:border-blue-300"
-                }`}
-                onClick={() => handleResponseChange(question.id, rating)}
-              >
-                {rating}
-              </button>
-            ))}
-          </div>
-        );
-
-      case "scale":
-        const scaleLabels = optionUtils.getScaleLabels(question);
-        const exclusionOptions = optionUtils.getScaleExclusions(question);
-        const isExclusionSelected = exclusionOptions.some(
-          (opt: string) => value === opt
-        );
-
-        return (
-          <div className="space-y-4">
-            {/* Scale Section */}
-            <div
-              className={`transition-opacity duration-300 ${isExclusionSelected ? "opacity-50" : "opacity-100"}`}
-            >
-              <div className="flex justify-between text-sm text-gray-600 mb-3">
-                <span>{scaleLabels[0]}</span>
-                <span>{scaleLabels[1]}</span>
-              </div>
-              <div className="flex gap-2 justify-between">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button
-                    key={rating}
-                    type="button"
-                    disabled={isExclusionSelected}
-                    className={`flex-1 h-10 rounded-lg border-2 flex items-center justify-center transition-all duration-200 font-semibold ${
-                      value === rating
-                        ? "bg-blue-500 border-blue-500 text-white"
-                        : "border-gray-300 hover:border-blue-300 text-gray-600"
-                    } ${isExclusionSelected ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    onClick={() => handleResponseChange(question.id, rating)}
-                  >
-                    {rating}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Exclusion Options */}
-            <div className="border-t pt-3">
-              <p className="text-sm text-gray-600 mb-2">
-                Or select one of the following:
-              </p>
-              <div className="space-y-1">
-                {exclusionOptions.map((option: string) => (
-                  <label
-                    key={option}
-                    className="flex items-center space-x-2 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={value === option}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          handleResponseChange(question.id, option);
-                        } else {
-                          handleResponseChange(question.id, "");
-                        }
-                      }}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-gray-700">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
-      case "multiple_choice":
+      case "multiple_choices":
+      case "radio":
+      case "dropdown":
+      case "yes_no":
         // Get randomized options with special handling - only randomize once
         const randomizedOptions = getRandomizedOptions(question);
 
         // Standard layout for all multiple choice questions
         const columns =
           optionUtils.organizeOptionsIntoColumns(randomizedOptions);
-        optionUtils.organizeOptionsIntoColumns(randomizedOptions);
 
         if (columns.length === 1) {
           // Single row layout for better space utilization
@@ -275,8 +203,9 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
             </div>
           );
         }
+        break;
 
-      case "checkbox":
+      case "fields":
         return (
           <div className="space-y-2">
             {question.options?.map((option, index) => (

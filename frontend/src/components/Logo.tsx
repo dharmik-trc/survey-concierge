@@ -13,9 +13,9 @@ export default function Logo({
   logoSrc,
 }: LogoProps) {
   const sizePx = {
-    sm: 36,
-    md: 56,
-    lg: 72,
+    sm: 62,
+    md: 102,
+    lg: 112,
   }[size];
 
   // If no logo source is provided, don't render anything

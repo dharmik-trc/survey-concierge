@@ -6,17 +6,33 @@ const API_BASE_URL =
 export interface Question {
   id: number;
   question_text: string;
-  question_type: string;
+  primary_type: string;
+  secondary_type: string;
+  // Backward compatibility - will be removed later
+  question_type?: string;
   is_required: boolean;
-  is_dropdown: boolean;
   order: number;
+  randomize_options: boolean;
+  has_none_option: boolean;
+  has_other_option: boolean;
   options?: string[];
   section_title?: string | null;
   subfields?: string[];
+  subfield_validations?: {
+    [fieldName: string]: {
+      type:
+        | "positive_number"
+        | "negative_number"
+        | "all_numbers"
+        | "email"
+        | "text"
+        | "auto_calculate";
+      required?: boolean;
+      formula?: string; // For auto-calculated fields like "Total"
+    };
+  };
   rows?: string[];
   columns?: string[];
-  scale_options?: string[]; // For scale questions: list of scale options
-  scale_exclusions?: string[]; // For scale questions: list of exclusion options
 }
 
 export interface Survey {
@@ -124,31 +140,62 @@ class ApiService {
 
 export const apiService = new ApiService();
 
+// Constants for special options
+export const OTHER_OPTION = "Other (please specify)";
+export const NONE_OPTION = "None of the Above";
+
 // Simplified utility functions for option handling
 export const optionUtils = {
   /**
-   * Simple randomization that excludes special options
+   * Get options with proper hierarchy: regular options (randomized if needed) + Other + None of the Above
    */
-  getRandomizedOptions: (options: string[]): string[] => {
+  getOptionsWithSpecialHandling: (
+    question: Question
+  ): { options: string[]; hasOtherOption: boolean; hasNoneOption: boolean } => {
+    const baseOptions = question.options || [];
+
+    // If randomization is enabled, randomize only the base options
+    let processedOptions = [...baseOptions];
+    if (question.randomize_options && baseOptions.length > 0) {
+      processedOptions = [...baseOptions].sort(() => Math.random() - 0.5);
+    }
+
+    // Build final options array with proper hierarchy
+    const finalOptions = [...processedOptions];
+
+    // Add "Other (please specify)" if enabled
+    if (question.has_other_option) {
+      finalOptions.push(OTHER_OPTION);
+    }
+
+    // Add "None of the Above" if enabled (always last)
+    if (question.has_none_option) {
+      finalOptions.push(NONE_OPTION);
+    }
+
+    return {
+      options: finalOptions,
+      hasOtherOption: question.has_other_option,
+      hasNoneOption: question.has_none_option,
+    };
+  },
+
+  /**
+   * Legacy function for backward compatibility
+   */
+  getRandomizedOptions: (
+    options: string[],
+    shouldRandomize: boolean = false
+  ): string[] => {
     if (!options || options.length === 0) return options;
 
-    // Simple exclusions - no need to store these
-    const specialOptions = ["other", "don't know", "none"];
-
-    // Separate regular and special options
-    const regular = options.filter(
-      (opt) =>
-        !specialOptions.some((special) => opt.toLowerCase().includes(special))
-    );
-    const special = options.filter((opt) =>
-      specialOptions.some((special) => opt.toLowerCase().includes(special))
-    );
+    // If randomization is disabled, return original order
+    if (!shouldRandomize) {
+      return [...options];
+    }
 
     // Randomize regular options only
-    const shuffled = [...regular].sort(() => Math.random() - 0.5);
-
-    // Keep special options at the end
-    return [...shuffled, ...special];
+    return [...options].sort(() => Math.random() - 0.5);
   },
 
   /**
@@ -165,14 +212,8 @@ export const optionUtils = {
    * Check if a question should be rendered as a scale
    */
   shouldRenderAsScale: (question: Question): boolean => {
-    return (
-      question.question_type === "scale" ||
-      (question.question_type === "multiple_choice" &&
-        question.options &&
-        question.options.length === 5 &&
-        question.question_text.toLowerCase().includes("experience")) ||
-      false
-    );
+    // Scale questions are no longer supported in the current QUESTION_HIERARCHY
+    return false;
   },
 
   /**
@@ -189,39 +230,5 @@ export const optionUtils = {
     // For 7 or more options, split into 2 balanced columns
     const midPoint = Math.ceil(options.length / 2);
     return [options.slice(0, midPoint), options.slice(midPoint)];
-  },
-
-  /**
-   * Get scale labels for a question
-   */
-  getScaleLabels: (question: Question): [string, string] => {
-    if (question.scale_options && question.scale_options.length >= 2) {
-      return [
-        question.scale_options[0],
-        question.scale_options[question.scale_options.length - 1],
-      ];
-    }
-
-    // Default labels based on question content
-    if (question.question_text.toLowerCase().includes("recruitment")) {
-      return ["Much harder", "Much easier"];
-    }
-    if (question.question_text.toLowerCase().includes("experience")) {
-      return ["Much worse", "Much better"];
-    }
-
-    return ["Strongly disagree", "Strongly agree"];
-  },
-
-  /**
-   * Get exclusion options for scale questions
-   */
-  getScaleExclusions: (question: Question): string[] => {
-    if (question.scale_exclusions) {
-      return question.scale_exclusions;
-    }
-
-    // Default exclusions
-    return ["Not applicable", "Don't know"];
   },
 };

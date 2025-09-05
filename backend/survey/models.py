@@ -2,12 +2,37 @@ from django.db import models
 import uuid
 
 # Create your models here.
+# Once you change this, you need to change question_admin.js
+QUESTION_HIERARCHY = {
+    "open_text": [
+        ("text", "Short Text"),
+        ("paragraph", "Paragraph / Long Text"),
+        ("number", "Number"),
+        ("email", "Email"),
+        ("date", "Date"),
+        ("time", "Time"),
+    ],
+    "form": [
+        ("multiple_choices", "Multiple Choices (Multi Select)"),
+        ("radio", "Radio (Single Select)"),
+        ("dropdown", "Dropdown"),
+        ("form_fields", "Form Fields (Multiple Inputs with Validation)"),
+        ("fields", "Custom Fields (Name, Address, etc.)"),
+        ("yes_no", "Yes / No"),
+    ],
+    "grid": [
+        ("grid_radio", "Grid (Single Select per row)"),
+        ("grid_multi", "Grid (Multi Select per row)"),
+        ("ranking", "Ranking"),
+    ],
+}
+
 
 class Survey(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    logo_url = models.URLField(blank=True, null=True, help_text="URL to the logo for this survey")
+    logo_url = models.CharField(blank=True, null=True, help_text="URL to the logo for this survey", max_length=200)
     concierge_logo_url = models.URLField(blank=True, null=True, help_text="URL to the Survey Concierge logo for this survey")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -17,42 +42,62 @@ class Survey(models.Model):
         return self.title
 
 class Question(models.Model):
-    QUESTION_TYPES = [
-        ('text', 'Text'),
-        ('multiple_choice', 'Multiple Choice'),
-        ('checkbox', 'Checkbox'),
-        ('rating', 'Rating'),
-        ('email', 'Email'),
-        ('number', 'Number'),
-        ('matrix', 'Matrix'),  # New type for composite/matrix questions
-        ('cross_matrix', 'Cross Matrix'),  # Cross-matrix radio question
-        ('cross_matrix_checkbox', 'Cross Matrix Checkbox'),  # Cross-matrix checkbox question
-        ('scale', 'Scale'),  # 5-point scale with special options
+    PRIMARY_TYPES = [
+        ("open_text", "Open Text"),
+        ("form", "Form"),
+        ("grid", "Grid"),
     ]
-    
-    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='questions')
+
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name="questions")
     question_text = models.TextField()
-    question_type = models.CharField(max_length=100, choices=QUESTION_TYPES, default='text')
+
+    primary_type = models.CharField(max_length=50, choices=PRIMARY_TYPES, default="open_text")
+    secondary_type = models.CharField(max_length=50, default="text")
+
+    # Common fields
     is_required = models.BooleanField(default=True)
-    is_dropdown = models.BooleanField(default=False, help_text="For multiple choice questions, use dropdown instead of radio buttons")
     order = models.IntegerField(default=0)
-    options = models.JSONField(blank=True, null=True)  # For multiple choice/checkbox questions
-    section_title = models.CharField(max_length=200, blank=True, null=True)  # For grouping questions into sections
-    subfields = models.JSONField(blank=True, null=True)  # For matrix questions: list of subfield names
-    rows = models.JSONField(blank=True, null=True)  # For matrix_radio: list of row labels
-    columns = models.JSONField(blank=True, null=True)  # For matrix_radio: list of column labels
+    randomize_options = models.BooleanField(default=False)
     
-    # Scale-specific fields
-    scale_options = models.JSONField(blank=True, null=True, help_text="For scale questions: list of scale options (e.g., ['Much harder', 'Harder', 'Same', 'Easier', 'Much easier'])")
-    scale_exclusions = models.JSONField(blank=True, null=True, help_text="For scale questions: list of exclusion options (e.g., ['Not applicable', 'Don't know', 'Did not recruit'])")
-    
+    # Special option controls
+    has_none_option = models.BooleanField(default=False, help_text='Add "None of the Above" option (always appears last)')
+    has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
+
+    # Options
+    options = models.JSONField(blank=True, null=True)
+
+    # Extra structures
+    section_title = models.CharField(max_length=200, blank=True, null=True)
+    subfields = models.JSONField(blank=True, null=True)
+    subfield_validations = models.JSONField(blank=True, null=True, help_text='Validation rules for each subfield: {"field_name": {"type": "positive_number|negative_number|email|text", "required": true}}')
+    rows = models.JSONField(blank=True, null=True)
+    columns = models.JSONField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
-        ordering = ['order', 'created_at']
-    
+        ordering = ["order", "created_at"]
+
+    @property
+    def question_type(self):
+        """Backward compatibility property that returns secondary_type"""
+        return self.secondary_type
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        valid_secondaries = dict(QUESTION_HIERARCHY).get(self.primary_type, [])
+        valid_secondary_keys = [s[0] for s in valid_secondaries]
+
+        if self.secondary_type not in valid_secondary_keys:
+            raise ValidationError(
+                f"Invalid secondary type '{self.secondary_type}' for primary type '{self.primary_type}'. "
+                f"Valid options are: {valid_secondary_keys}"
+            )
+
     def __str__(self):
         return f"{self.survey.title} - {self.question_text[:50]}"
+
 
 class SurveyResponse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

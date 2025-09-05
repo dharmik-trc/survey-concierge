@@ -61,7 +61,7 @@ class Command(BaseCommand):
             },
             {
                 'question_text': 'Revenue of your association in GBP based on your latest approved financial statements:',
-                'question_type': 'matrix',
+                'question_type': 'form_fields',
                 'is_required': True,
                 'order': 7,
                 'subfields': [
