@@ -11,7 +11,8 @@ import {
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
-import Logo from "../../../components/Logo";
+import ConciergeLogo from "../../../components/ConciergeLogo";
+import SurveyLogo from "../../../components/SurveyLogo";
 import SearchableDropdown from "../../../components/SearchableDropdown";
 
 interface SurveyResponse {
@@ -1975,18 +1976,11 @@ export default function SurveyPage({
       <header className="bg-white shadow-sm border-b border-gray-100 flex-shrink-0">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            {/* Logo on the left */}
-            <Logo size="md" logoSrc={survey?.logo_url} />
+            {/* Survey Company Logo on the left */}
+            <SurveyLogo size="md" logoSrc={survey?.logo_url} />
 
-            {/* Survey info on the right */}
-            <div className="text-right">
-              <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Survey Concierge
-              </h1>
-              <p className="text-gray-500 text-xs sm:text-sm">
-                Professional Survey Platform
-              </p>
-            </div>
+            {/* TSC Concierge Logo on the right */}
+            <ConciergeLogo size="md" />
           </div>
         </div>
       </header>

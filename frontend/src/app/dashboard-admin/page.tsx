@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { apiService, SurveyListItem } from "../../lib/api";
+import ConciergeLogo from "../../components/ConciergeLogo";
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
@@ -160,15 +161,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Survey Concierge
-              </h1>
-              <p className="text-gray-500 text-sm">
-                Professional Survey Platform
-              </p>
+            <div className="flex items-center space-x-4">
+              <ConciergeLogo size="lg" />
             </div>
             <button
               onClick={handleLogout}

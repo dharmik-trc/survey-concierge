@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Survey Concierge - Professional Survey Platform",
+  title: "TSC Survey Platform",
   description:
     "Create, manage, and share professional surveys with ease. Collect valuable insights and feedback from your audience with our modern survey platform.",
   keywords: [
@@ -33,12 +33,12 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("http://localhost:3000"),
+  metadataBase: new URL("http://localhost:4545"),
   openGraph: {
     title: "Survey Concierge - Professional Survey Platform",
     description:
       "Create, manage, and share professional surveys with ease. Collect valuable insights and feedback from your audience.",
-    url: "http://localhost:3000",
+    url: "http://localhost:4545",
     siteName: "Survey Concierge",
     locale: "en_US",
     type: "website",
@@ -62,15 +62,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/favicon.ico",
+        url: "/logos/TSC_Logo_Square_With_BG.png?v=4",
         sizes: "any",
       },
       {
-        url: "/icon.svg",
-        type: "image/svg+xml",
+        url: "/logos/TSC_Logo_Square_With_BG.png?v=4",
+        type: "image/png",
       },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: "/logos/TSC_Logo_Square_With_BG.png?v=4",
   },
   manifest: "/manifest.json",
 };
@@ -84,10 +84,26 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/logos/TSC_Logo_Square_With_BG.png?v=4" />
+        <link
+          rel="icon"
+          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
+          sizes="any"
+        />
+        <link
+          rel="icon"
+          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
+          type="image/png"
+        />
+        <link
+          rel="shortcut icon"
+          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
+        />
+        <link
+          rel="apple-touch-icon"
+          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
+        />
+        <link rel="manifest" href="/manifest.json?v=4" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

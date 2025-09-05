@@ -3,6 +3,22 @@
 - salary questions in the survey
 - Give soft reminder to the user when total sum is 0 (for form numeric questions, example: 27 - salary)
 
+<!-- Rename Matrix to Form Type - Backend CHANGES-->
+<!-- Top Level Hierarchy - Open Text, Form, Grid -> Secondary Hierarchy-->
+<!-- Randomize options at questions level -->
+<!-- Bigger the logo -->
+<!-- In a number type - remove arrow up and down from the  -->
+<!-- Negative number accepting is for not all number field - put checkbox in admin panel -->
+<!-- Question 9 - need addition / subtraction feature for total constant -->
+<!-- change every placeholder "Enter Response" -->
+<!-- in a text form field - have validation for all the boxes Question 9 -->
+<!-- Question: 5 Even if 1 field is answered, it accepting it when question type is_required=True, it should ask for all of them in order -->
+<!-- Question: 20 Please specify box is coming for 1 of the box which is not option "other" -->
+<!-- Question: 20 When none of the above is selected, dont let user select any other options -->
+<!-- none of the above, others should be at the admin level (configured via secondary_type) -->
+<!-- Nonr of the above, or other shoild not be randomize - NOTA is always last -->
+<!-- carosul for grid questions -->
+
 # Survey Concierge - Professional Survey Platform
 
 A modern, full-stack survey platform built with Next.js frontend and Django backend, featuring step-by-step survey forms, real-time validation, and comprehensive response tracking. Survey Concierge provides a professional solution for creating, managing, and analyzing surveys with a beautiful, branded interface.
