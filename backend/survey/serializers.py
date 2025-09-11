@@ -4,6 +4,12 @@ from django.core.exceptions import ValidationError
 import re
 from .models import Survey, Question, SurveyResponse, QuestionResponse
 
+# Character limits for different field types
+MAX_TEXT_LENGTH = 99999
+MAX_EMAIL_LENGTH = 254  # Standard email length limit
+MAX_NUMBER_LENGTH = 50  # Reasonable limit for number fields
+MAX_CHOICE_LENGTH = 1000  # Limit for individual choice values
+
 # Utility functions for question handling (scale functions removed as no longer needed)
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -12,7 +18,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
@@ -46,8 +52,16 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         if not answer_type:
             raise serializers.ValidationError("Answer type is required")
 
+        # Validate character limits
+        self._validate_character_limits(question, answer, answer_type)
+
+        # Check if this is a comment box response (answer_type will be 'text' for comment boxes)
+        if answer_type == 'text':
+            # Comment boxes are always text fields, no special validation needed
+            return data
+
         # Validate based on question type (using secondary_type)
-        question_type = question.secondary_type
+        question_type = question.secondary_type or question.question_type
         if question_type == 'email':
             if answer and not self._is_valid_email(answer):
                 raise serializers.ValidationError("Please enter a valid email address")
@@ -57,18 +71,42 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         elif question_type in ['multiple_choices', 'radio', 'dropdown', 'yes_no', 'fields']:
             if question.options and answer:
                 def is_valid_choice(choice):
+                    print(f"Validating choice: '{choice}', has_other_option: {question.has_other_option}, options: {question.options}")
+                    
+                    # Handle combined answer+comment objects
+                    if isinstance(choice, dict) and 'answer' in choice:
+                        # Extract the actual answer from the combined object
+                        actual_answer = choice['answer']
+                        # If the actual answer is an array, validate each item
+                        if isinstance(actual_answer, list):
+                            for item in actual_answer:
+                                if not is_valid_choice(item):
+                                    return False
+                            return True
+                        else:
+                            return is_valid_choice(actual_answer)  # Recursively validate the actual answer
+                    
                     if isinstance(choice, dict) and 'other' in choice:
                         # Accept structured 'Other' answers if 'Other' option is present
                         return any(opt.lower().startswith('other') for opt in question.options)
                     if choice in question.options:
                         return True
+                    # Allow "None of the Above" if the question has this option enabled
+                    if question.has_none_option and str(choice) == "None of the Above":
+                        return True
                     # Allow custom 'Other' values for 'Other, please specify' (legacy string format)
-                    if any(opt.lower().startswith('other') for opt in question.options) and str(choice).startswith('Other:'):
+                    if str(choice).startswith('Other:'):
                         # Ensure the "Other:" response has actual content after the colon
                         other_content = str(choice)[6:].strip()  # Remove "Other:" prefix
                         if not other_content:
                             return False  # Invalid if no content after "Other:"
+                        print(f"Valid 'Other:' choice: '{choice}'")
                         return True
+                    # Allow any custom text if the question has "Other" option enabled
+                    if question.has_other_option:
+                        print(f"Valid custom text for 'Other' option: '{choice}'")
+                        return True  # Allow any custom text for "Other" option
+                    print(f"Invalid choice: '{choice}'")
                     return False
 
                 if isinstance(answer, list):
@@ -142,8 +180,19 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                 if not answer or (isinstance(answer, list) and len(answer) == 0):
                     raise serializers.ValidationError("This field is required")
             elif question_type in ['form_fields']:
-                if not answer or not isinstance(answer, dict) or not answer:
+                if not answer or not isinstance(answer, dict):
                     raise serializers.ValidationError("This field is required")
+                # For form_fields, allow empty dict if no subfields are explicitly required
+                if isinstance(answer, dict) and not answer:
+                    # Check if any subfields are explicitly required
+                    has_required_subfields = False
+                    if question.subfield_validations:
+                        for subfield, validation in question.subfield_validations.items():
+                            if validation.get('required') is True:
+                                has_required_subfields = True
+                                break
+                    if has_required_subfields:
+                        raise serializers.ValidationError("This field is required")
             elif question_type in ['grid_radio']:
                 if not answer or not isinstance(answer, dict) or not answer:
                     raise serializers.ValidationError("This field is required")
@@ -172,6 +221,29 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
             return True
         except (ValueError, TypeError):
             return False
+
+    def _validate_character_limits(self, question, answer, answer_type):
+        """Validate character limits for different answer types"""
+        if not answer:
+            return
+            
+        question_type = question.secondary_type
+        
+        if question_type in ['text', 'paragraph']:
+            # Text and paragraph fields
+            if isinstance(answer, str) and len(answer) > MAX_TEXT_LENGTH:
+                raise serializers.ValidationError(f"Text response cannot exceed {MAX_TEXT_LENGTH} characters")
+                
+        elif question_type == 'email':
+            # Email fields
+            if isinstance(answer, str) and len(answer) > MAX_EMAIL_LENGTH:
+                raise serializers.ValidationError(f"Email cannot exceed {MAX_EMAIL_LENGTH} characters")
+                
+        elif question_type == 'number':
+            # Number fields
+            if isinstance(answer, str) and len(answer) > MAX_NUMBER_LENGTH:
+                raise serializers.ValidationError(f"Number cannot exceed {MAX_NUMBER_LENGTH} characters")
+                
 
 class SurveyResponseSerializer(serializers.ModelSerializer):
     question_responses = QuestionResponseSerializer(many=True)

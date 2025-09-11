@@ -16,7 +16,7 @@ export default function SearchableDropdown({
   onChange,
   onBlur,
   options,
-  placeholder = "Select an option...",
+  placeholder = "Start typing...",
   className = "",
 }: SearchableDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -111,7 +111,7 @@ export default function SearchableDropdown({
           <div className="p-3 border-b border-gray-200">
             <input
               type="text"
-              placeholder="Search options..."
+              placeholder="Start typing..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900"

@@ -109,11 +109,45 @@ def submit_survey_response(request, survey_id):
         # Process the responses from request data
         responses = request.data.get('responses', {})
         
+        # First pass: collect comment responses
+        comment_responses = {}
         for question_id, answer in responses.items():
-            question = get_object_or_404(Question, id=question_id, survey=survey)
+            if isinstance(question_id, str) and question_id.endswith('_comment'):
+                parent_question_id = question_id.replace('_comment', '')
+                try:
+                    parent_question_id = int(parent_question_id)
+                    comment_responses[parent_question_id] = answer
+                except ValueError:
+                    continue
+        
+        # Second pass: process regular question responses and combine with comments
+        for question_id, answer in responses.items():
+            # Skip comment fields - they're handled separately
+            if isinstance(question_id, str) and question_id.endswith('_comment'):
+                continue
+            
+            # Handle regular question responses
+            try:
+                question_id_int = int(question_id)
+            except (ValueError, TypeError):
+                continue  # Skip invalid question IDs
+            
+            question = get_object_or_404(Question, id=question_id_int, survey=survey)
+            
+            # Combine main answer with comment if it exists
+            combined_answer = answer
+            if question_id_int in comment_responses:
+                comment_text = comment_responses[question_id_int]
+                if comment_text and comment_text.strip():
+                    # Store as an object with both answer and comment
+                    combined_answer = {
+                        'answer': answer,
+                        'comment': comment_text
+                    }
+            
             question_response = {
                 'question': question.id,
-                'answer': answer,
+                'answer': combined_answer,
                 'answer_type': question.question_type
             }
             response_data['question_responses'].append(question_response)

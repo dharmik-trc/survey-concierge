@@ -48,6 +48,12 @@ class Question(models.Model):
         ("grid", "Grid"),
     ]
 
+    # Character limits for different field types
+    MAX_TEXT_LENGTH = 99999
+    MAX_EMAIL_LENGTH = 254
+    MAX_NUMBER_LENGTH = 50
+    MAX_CHOICE_LENGTH = 1000
+
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name="questions")
     question_text = models.TextField()
 
@@ -62,6 +68,13 @@ class Question(models.Model):
     # Special option controls
     has_none_option = models.BooleanField(default=False, help_text='Add "None of the Above" option (always appears last)')
     has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
+    
+    # Comment box (separate from Other option)
+    has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')
+    comment_box_rows = models.IntegerField(default=3, help_text='Number of rows for comment box (1-10)')
+    comment_box_label = models.CharField(max_length=200, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
+    
+    row_count = models.IntegerField(default=1, help_text='Number of rows for text questions')
 
     # Options
     options = models.JSONField(blank=True, null=True)

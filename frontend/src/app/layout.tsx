@@ -62,15 +62,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/logos/TSC_Logo_Square_With_BG.png?v=4",
+        url: "/logos/TSC_Favicon.png?v=4",
         sizes: "any",
       },
       {
-        url: "/logos/TSC_Logo_Square_With_BG.png?v=4",
+        url: "/logos/TSC_Favicon.png?v=4",
         type: "image/png",
       },
     ],
-    apple: "/logos/TSC_Logo_Square_With_BG.png?v=4",
+    apple: "/logos/TSC_Favicon.png?v=4",
   },
   manifest: "/manifest.json",
 };
@@ -84,25 +84,11 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" href="/logos/TSC_Logo_Square_With_BG.png?v=4" />
-        <link
-          rel="icon"
-          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
-          sizes="any"
-        />
-        <link
-          rel="icon"
-          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
-          type="image/png"
-        />
-        <link
-          rel="shortcut icon"
-          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
-        />
-        <link
-          rel="apple-touch-icon"
-          href="/logos/TSC_Logo_Square_With_BG.png?v=4"
-        />
+        <link rel="icon" href="/logos/TSC_Favicon.png?v=4" />
+        <link rel="icon" href="/logos/TSC_Favicon.png?v=4" sizes="any" />
+        <link rel="icon" href="/logos/TSC_Favicon.png?v=4" type="image/png" />
+        <link rel="shortcut icon" href="/logos/TSC_Favicon.png?v=4" />
+        <link rel="apple-touch-icon" href="/logos/TSC_Favicon.png?v=4" />
         <link rel="manifest" href="/manifest.json?v=4" />
       </head>
       <body

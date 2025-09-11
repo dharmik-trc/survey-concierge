@@ -22,11 +22,12 @@ interface SurveyResponse {
     | string[]
     | null
     | { [subfield: string]: number | null }
-    | { [row: string]: string };
+    | { [row: string]: string }
+    | { [row: string]: string[] };
 }
 
 interface ValidationErrors {
-  [questionId: number]: string;
+  [questionId: string | number]: string;
 }
 
 // Validation function for individual subfields
@@ -211,18 +212,18 @@ export default function SurveyPage({
       return value.trim() !== "";
     }
     if (typeof value === "number") {
-      // For scale questions, allow 0 as valid (in case someone selects rating 0)
-      // but for other number questions, 0 might be invalid
-      if (questionType === "scale") {
-        return true; // Any number is valid for scale
-      }
-      return value !== 0;
+      // Allow 0 as valid for all number questions
+      return true;
+    }
+    // For number fields, empty string should be considered invalid for required fields
+    if (questionType === "number" && value === "") {
+      return false;
     }
     return value !== undefined && value !== null && value !== "";
   };
 
   const validateQuestion = (
-    questionId: number,
+    questionId: number | string,
     value: any,
     questionType: string
   ): string | null => {
@@ -331,11 +332,34 @@ export default function SurveyPage({
 
       case "form_fields":
         if (!value || typeof value !== "object" || Array.isArray(value)) {
-          console.log(
-            `Question ${questionId} form_fields validation failed:`,
-            value
-          );
-          return "Please enter values for all subfields";
+          // Only require form_fields if the question itself is required
+          if (question.is_required) {
+            return "Please enter values for all subfields";
+          }
+          // If not required, allow empty form_fields
+          break;
+        }
+
+        // If form_fields is empty object, check if any subfields are explicitly required
+        if (typeof value === "object" && Object.keys(value).length === 0) {
+          if (question.is_required) {
+            // Check if any subfields are explicitly required
+            let hasRequiredSubfields = false;
+            if (question.subfield_validations) {
+              for (const subfield of question.subfields || []) {
+                const validation = question.subfield_validations[subfield];
+                if (validation?.required === true) {
+                  hasRequiredSubfields = true;
+                  break;
+                }
+              }
+            }
+            if (hasRequiredSubfields) {
+              return "Please enter values for all subfields";
+            }
+          }
+          // If no required subfields, allow empty form_fields
+          break;
         }
 
         // Validate each subfield based on its validation rules
@@ -349,16 +373,21 @@ export default function SurveyPage({
               continue;
             }
 
-            // Check if required field is empty
             if (
-              validation?.required !== false &&
-              (!fieldValue || fieldValue === "")
+              validation?.required == true &&
+              (fieldValue === undefined ||
+                fieldValue === null ||
+                fieldValue === "")
             ) {
               return `${subfield} is required`;
             }
 
             // Skip validation if field is empty and not required
-            if (!fieldValue || fieldValue === "") {
+            if (
+              fieldValue === undefined ||
+              fieldValue === null ||
+              fieldValue === ""
+            ) {
               continue;
             }
 
@@ -410,7 +439,7 @@ export default function SurveyPage({
   };
 
   const handleResponseChange = (
-    questionId: number,
+    questionId: number | string,
     value:
       | string
       | string[]
@@ -436,7 +465,7 @@ export default function SurveyPage({
   };
 
   const handleBlur = (
-    questionId: number,
+    questionId: number | string,
     value: any,
     _questionType: string
   ) => {
@@ -525,7 +554,6 @@ export default function SurveyPage({
       return;
     }
 
-    console.log("All validation passed, proceeding with submission...");
     setSubmitting(true);
     try {
       // Send the responses to the backend
@@ -737,6 +765,7 @@ export default function SurveyPage({
               rows={4}
               placeholder="Enter your answer..."
               value={(value as string) || ""}
+              maxLength={99999}
               onChange={(e) =>
                 handleResponseChange(question.id, e.target.value)
               }
@@ -807,9 +836,15 @@ export default function SurveyPage({
               placeholder="Enter a number (positive or negative)..."
               value={(value as number) || ""}
               onChange={(e) => {
-                const numValue =
-                  e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
-                handleResponseChange(question.id, numValue);
+                const inputValue = e.target.value;
+                if (inputValue === "") {
+                  handleResponseChange(question.id, "");
+                } else {
+                  const numValue = parseFloat(inputValue);
+                  if (!isNaN(numValue)) {
+                    handleResponseChange(question.id, numValue);
+                  }
+                }
               }}
               onBlur={(e) =>
                 handleBlur(question.id, e.target.value, questionType)
@@ -864,10 +899,22 @@ export default function SurveyPage({
             } else {
               newValues = [];
             }
+          } else if (selectedOption === otherOption) {
+            // If "Other, please specify" is checked, clear all other selections
+            if (isChecked) {
+              newValues = [otherOption];
+            } else {
+              newValues = [];
+              setOtherText("");
+            }
           } else {
-            // If any other option is selected and "None of the Above" was previously selected, remove it
+            // If any other option is selected and "None of the Above" or "Other" was previously selected, remove them
             if (isNoneSelected) {
               newValues = newValues.filter((v) => v !== noneOption);
+            }
+            if (isOtherSelected) {
+              newValues = newValues.filter((v) => v !== otherOption);
+              setOtherText("");
             }
 
             if (isChecked) {
@@ -878,9 +925,6 @@ export default function SurveyPage({
             } else {
               // Remove the option
               newValues = newValues.filter((v) => v !== selectedOption);
-              if (selectedOption === otherOption) {
-                setOtherText("");
-              }
             }
           }
 
@@ -935,6 +979,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1020,6 +1065,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1078,19 +1124,18 @@ export default function SurveyPage({
             handleResponseChange(question.id, noneOption);
             setOtherText("");
           }
-          // If any other option is selected and "None of the Above" was previously selected, switch to new option
-          else if (isNoneSelected && selectedOption !== noneOption) {
-            handleResponseChange(question.id, selectedOption);
-            if (selectedOption !== otherOption) {
+          // If "Other, please specify" is selected, clear other text if switching from another option
+          else if (selectedOption === otherOption) {
+            handleResponseChange(question.id, otherOption);
+            // Keep existing other text if already selected, clear if switching from another option
+            if (!isOtherSelected) {
               setOtherText("");
             }
           }
-          // Normal selection
+          // If any other option is selected, clear "Other" text
           else {
             handleResponseChange(question.id, selectedOption);
-            if (selectedOption !== otherOption) {
-              setOtherText("");
-            }
+            setOtherText("");
           }
         };
 
@@ -1105,7 +1150,7 @@ export default function SurveyPage({
                 }
                 onBlur={() => handleBlur(question.id, value, questionType)}
                 options={randomizedOptions}
-                placeholder="Select an option..."
+                placeholder="Start typing..."
                 className="w-full"
               />
               {/* Show text input if 'Other' is selected */}
@@ -1116,6 +1161,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1192,6 +1238,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1272,6 +1319,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1370,6 +1418,7 @@ export default function SurveyPage({
                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black border-gray-300 focus:ring-indigo-500"
                     placeholder="Please specify..."
                     value={otherText}
+                    maxLength={99999}
                     onChange={(e) => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
@@ -1974,7 +2023,7 @@ export default function SurveyPage({
     >
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100 flex-shrink-0">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+        <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-1 sm:py-1">
           <div className="flex items-center justify-between">
             {/* Survey Company Logo on the left */}
             <SurveyLogo size="md" logoSrc={survey?.logo_url} />
@@ -1985,9 +2034,9 @@ export default function SurveyPage({
         </div>
       </header>
 
-      {/* Top-Right Save Notification */}
+      {/* Bottom-Right Save Notification */}
       {showSaveNotification && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center animate-fade-in">
+        <div className="fixed bottom-4 right-4 z-50 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center animate-fade-in">
           <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
@@ -1999,19 +2048,22 @@ export default function SurveyPage({
         </div>
       )}
 
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="flex-1 flex items-start justify-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <div className="w-full max-w-4xl lg:max-w-6xl">
           <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8">
             {/* Survey Header with Logo */}
             <div className="mb-8">
-              <div className="mb-6">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3">
-                  {survey.title}
-                </h1>
-                <p className="text-gray-600 text-sm sm:text-base">
-                  {survey.description}
-                </p>
-              </div>
+              {/* Show title and description only on first question */}
+              {currentSectionIndex === 0 && (
+                <div className="mb-6">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3">
+                    {survey.title}
+                  </h1>
+                  <p className="text-gray-600 text-sm sm:text-base whitespace-pre-line">
+                    {survey.description}
+                  </p>
+                </div>
+              )}
 
               {/* Resume Progress Notification */}
               {isRestoringProgress && (
@@ -2103,6 +2155,41 @@ export default function SurveyPage({
                           )}
                         </div>
                         {renderQuestion(question)}
+
+                        {/* Comment Box - separate from Other option */}
+                        {question.has_comment_box && (
+                          <div className="mt-4">
+                            {question.comment_box_label && (
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                {question.comment_box_label}
+                              </label>
+                            )}
+                            <textarea
+                              className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-sm sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                              rows={question.comment_box_rows || 3}
+                              placeholder="Enter your comments..."
+                              value={
+                                (responses[
+                                  `${question.id}_comment`
+                                ] as string) || ""
+                              }
+                              maxLength={99999}
+                              onChange={(e) =>
+                                handleResponseChange(
+                                  `${question.id}_comment`,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={(e) =>
+                                handleBlur(
+                                  `${question.id}_comment`,
+                                  e.target.value,
+                                  "text"
+                                )
+                              }
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -15,6 +15,9 @@ export interface Question {
   randomize_options: boolean;
   has_none_option: boolean;
   has_other_option: boolean;
+  has_comment_box: boolean;
+  comment_box_rows: number;
+  comment_box_label?: string | null;
   options?: string[];
   section_title?: string | null;
   subfields?: string[];
@@ -141,7 +144,7 @@ class ApiService {
 export const apiService = new ApiService();
 
 // Constants for special options
-export const OTHER_OPTION = "Other (please specify)";
+export const OTHER_OPTION = "Other, please specify";
 export const NONE_OPTION = "None of the Above";
 
 // Simplified utility functions for option handling
