@@ -202,6 +202,10 @@ STATICFILES_FINDERS = [
 # Use simpler storage for better compatibility
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
+# Additional WhiteNoise settings for better compatibility
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
+
 # Logging configuration
 LOGGING = {
     'version': 1,

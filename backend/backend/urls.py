@@ -25,7 +25,10 @@ def admin_test(request):
     return JsonResponse({
         'admin_available': True,
         'admin_url': '/admin/',
-        'message': 'Admin panel should be accessible'
+        'message': 'Admin panel should be accessible',
+        'static_url': '/static/',
+        'static_root': settings.STATIC_ROOT,
+        'static_files_storage': settings.STATICFILES_STORAGE
     })
 
 urlpatterns = [
