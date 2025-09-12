@@ -37,6 +37,7 @@ class Survey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    store_basic_details = models.BooleanField(default=False, help_text="Enable storing basic details (like email) when users click Next on specific questions")
     
     def __str__(self):
         return self.title
@@ -73,6 +74,9 @@ class Question(models.Model):
     has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')
     comment_box_rows = models.IntegerField(default=3, help_text='Number of rows for comment box (1-10)')
     comment_box_label = models.CharField(max_length=200, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
+    
+    # Basic details storage
+    store_on_next = models.BooleanField(default=False, help_text='Store this question\'s answer when user clicks Next (only works if survey has store_basic_details enabled)')
     
     row_count = models.IntegerField(default=1, help_text='Number of rows for text questions')
 
@@ -135,3 +139,30 @@ class QuestionResponse(models.Model):
 
     def __str__(self):
         return f"Response to {self.question.question_text[:30]} ({self.answer_type})"
+
+
+class PartialSurveyResponse(models.Model):
+    """Store partial responses for surveys that have store_basic_details enabled"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='partial_responses')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    answer = models.JSONField()  # Store the answer as JSON
+    answer_type = models.CharField(max_length=100)  # e.g., 'text', 'email', 'number', etc.
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True)
+    session_id = models.CharField(max_length=100, blank=True, null=True, help_text="Browser session ID to track user")
+    is_completed = models.BooleanField(default=False, help_text="True if this partial response was converted to a complete survey response")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['survey', 'question', 'ip_address', 'session_id']
+        indexes = [
+            models.Index(fields=['survey', 'ip_address']),
+            models.Index(fields=['survey', 'session_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_completed']),
+        ]
+
+    def __str__(self):
+        return f"Partial response to {self.question.question_text[:30]} from {self.ip_address}"

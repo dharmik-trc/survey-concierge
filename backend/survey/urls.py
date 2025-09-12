@@ -5,7 +5,8 @@ from .views import (
     survey_detail, 
     questions_by_survey, 
     question_detail,
-    submit_survey_response
+    submit_survey_response,
+    save_partial_response
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path('surveys/<uuid:survey_id>/questions/', questions_by_survey, name='questions_by_survey'),
     path('surveys/<uuid:survey_id>/questions/<int:question_id>/', question_detail, name='question_detail'),
     path('surveys/<uuid:survey_id>/submit/', submit_survey_response, name='submit_survey_response'),
+    path('surveys/<uuid:survey_id>/questions/<int:question_id>/save-partial/', save_partial_response, name='save_partial_response'),
 ] 

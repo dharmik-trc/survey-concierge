@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.core.validators import EmailValidator
 from django.core.exceptions import ValidationError
 import re
-from .models import Survey, Question, SurveyResponse, QuestionResponse
+from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse
 
 # Character limits for different field types
 MAX_TEXT_LENGTH = 99999
@@ -18,14 +18,14 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     
     class Meta:
         model = Survey
-        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'questions']
+        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'store_basic_details', 'questions']
 
 class SurveyListSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()
@@ -280,4 +280,82 @@ class SurveyResponseSerializer(serializers.ModelSerializer):
                 **response_data
             )
         
-        return survey_response 
+        return survey_response
+
+
+class PartialSurveyResponseSerializer(serializers.ModelSerializer):
+    """Serializer for storing partial survey responses"""
+    
+    class Meta:
+        model = PartialSurveyResponse
+        fields = ['id', 'survey', 'question', 'answer', 'answer_type', 'ip_address', 'user_agent', 'session_id', 'is_completed', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'is_completed']
+    
+    def validate(self, data):
+        survey = data.get('survey')
+        question = data.get('question')
+        answer = data.get('answer')
+        answer_type = data.get('answer_type')
+        
+        if not survey:
+            raise serializers.ValidationError("Survey is required")
+        if not question:
+            raise serializers.ValidationError("Question is required")
+        if not answer_type:
+            raise serializers.ValidationError("Answer type is required")
+        
+        # Check if survey has store_basic_details enabled
+        if not survey.store_basic_details:
+            raise serializers.ValidationError("Survey does not have basic details storage enabled")
+        
+        # Check if question has store_on_next enabled
+        if not question.store_on_next:
+            raise serializers.ValidationError("Question does not have store_on_next enabled")
+        
+        # Validate character limits (reuse existing validation logic)
+        self._validate_character_limits(question, answer, answer_type)
+        
+        # Basic validation based on question type
+        question_type = question.secondary_type or question.question_type
+        if question_type == 'email':
+            if answer and not self._is_valid_email(answer):
+                raise serializers.ValidationError("Please enter a valid email address")
+        elif question_type == 'number':
+            if answer and not self._is_valid_number(answer):
+                raise serializers.ValidationError("Please enter a valid number")
+        
+        return data
+    
+    def _is_valid_email(self, email):
+        email_validator = EmailValidator()
+        try:
+            email_validator(email)
+            return True
+        except ValidationError:
+            return False
+
+    def _is_valid_number(self, value):
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    def _validate_character_limits(self, question, answer, answer_type):
+        """Validate character limits for different answer types"""
+        if not answer:
+            return
+            
+        question_type = question.secondary_type
+        
+        if question_type in ['text', 'paragraph']:
+            if isinstance(answer, str) and len(answer) > MAX_TEXT_LENGTH:
+                raise serializers.ValidationError(f"Text response cannot exceed {MAX_TEXT_LENGTH} characters")
+                
+        elif question_type == 'email':
+            if isinstance(answer, str) and len(answer) > MAX_EMAIL_LENGTH:
+                raise serializers.ValidationError(f"Email cannot exceed {MAX_EMAIL_LENGTH} characters")
+                
+        elif question_type == 'number':
+            if isinstance(answer, str) and len(answer) > MAX_NUMBER_LENGTH:
+                raise serializers.ValidationError(f"Number cannot exceed {MAX_NUMBER_LENGTH} characters") 

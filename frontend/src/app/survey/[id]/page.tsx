@@ -112,6 +112,7 @@ export default function SurveyPage({
   const [randomizedOptions, setRandomizedOptions] = useState<{
     [questionId: string]: string[];
   }>({});
+  const [sessionId, setSessionId] = useState<string>("");
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
@@ -148,6 +149,10 @@ export default function SurveyPage({
   };
 
   useEffect(() => {
+    // Get or create session ID from cookies
+    const currentSessionId = cookieUtils.getOrCreateSessionId(surveyId);
+    setSessionId(currentSessionId);
+
     // Only make request if we haven't already
     if (hasRequested.current) return;
     hasRequested.current = true;
@@ -476,7 +481,7 @@ export default function SurveyPage({
     }));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!survey) return;
 
     const currentQuestion = survey.questions[currentQuestionIndex];
@@ -495,6 +500,30 @@ export default function SurveyPage({
         [currentQuestion.id]: error,
       }));
       return; // Don't proceed if validation fails
+    }
+
+    // Save partial response if survey has store_basic_details enabled and question has store_on_next enabled
+    if (
+      survey.store_basic_details &&
+      currentQuestion.store_on_next &&
+      currentValue !== null &&
+      currentValue !== undefined
+    ) {
+      try {
+        await apiService.savePartialResponse(
+          survey.id,
+          currentQuestion.id,
+          currentValue,
+          sessionId
+        );
+        console.log(
+          `Partial response saved for question ${currentQuestion.id}:`,
+          currentValue
+        );
+      } catch (error) {
+        console.error("Failed to save partial response:", error);
+        // Don't block the user flow if partial save fails
+      }
     }
 
     if (currentQuestionIndex < survey.questions.length - 1) {
@@ -704,7 +733,8 @@ export default function SurveyPage({
       }
       const result = await apiService.submitSurveyResponse(
         surveyId,
-        sanitizedResponses
+        sanitizedResponses,
+        sessionId
       );
       console.log("Survey submitted successfully:", result);
 
@@ -1893,14 +1923,59 @@ export default function SurveyPage({
     (section) => section.questions
   );
 
-  const handleNextSection = () => {
+  const handleNextSection = async () => {
+    console.log("handleNextSection", sessionId);
+    console.log("survey", survey);
+
+    console.log("currentSectionIndex", currentSectionIndex);
+    console.log("sections", sections);
+    console.log("sections.length", sections.length);
+
     if (currentSectionIndex < sections.length - 1) {
+      console.log(
+        "currentSectionIndex < sections.length - 1",
+        currentSectionIndex < sections.length - 1
+      );
+      console.log("survey?.store_basic_details", survey?.store_basic_details);
+      // Save partial responses for questions in current section that have store_on_next enabled
+      if (survey?.store_basic_details) {
+        console.log("survey.store_basic_details", survey.store_basic_details);
+        const currentSection = sections[currentSectionIndex];
+        for (const question of currentSection.questions) {
+          if (
+            question.store_on_next &&
+            responses[question.id] !== null &&
+            responses[question.id] !== undefined
+          ) {
+            try {
+              console.log("question", question);
+              console.log("responses[question.id]", responses[question.id]);
+              console.log("sessionId", sessionId);
+              await apiService.savePartialResponse(
+                survey.id,
+                question.id,
+                responses[question.id],
+                sessionId
+              );
+              console.log(
+                `Partial response saved for question ${question.id}:`,
+                responses[question.id]
+              );
+            } catch (error) {
+              console.error("Failed to save partial response:", error);
+              // Don't block the user flow if partial save fails
+            }
+          }
+        }
+      }
+
       // Save current progress to cookies before moving to next section
       const progressData: CookieData = {
         responses,
         currentSectionIndex: currentSectionIndex + 1, // Save the next section index
         otherTexts,
         timestamp: Date.now(),
+        sessionId: sessionId, // Include session ID for partial response tracking
       };
       cookieUtils.saveSurveyProgress(surveyId, progressData);
       console.log("Saved survey progress to cookies:", progressData);

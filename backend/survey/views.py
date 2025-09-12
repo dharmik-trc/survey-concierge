@@ -10,8 +10,8 @@ from django.shortcuts import get_object_or_404
 import openpyxl
 import io
 
-from .models import Survey, Question, SurveyResponse, QuestionResponse
-from .serializers import SurveySerializer, SurveyListSerializer, QuestionSerializer, SurveyResponseSerializer
+from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse
+from .serializers import SurveySerializer, SurveyListSerializer, QuestionSerializer, SurveyResponseSerializer, PartialSurveyResponseSerializer
 
 # Create your views here.
 
@@ -162,6 +162,19 @@ def submit_survey_response(request, survey_id):
             survey_response = serializer.save()
             print(f"Survey response created with ID: {survey_response.id}")
             print(f"IP address saved: {survey_response.ip_address}")
+            
+            # Clean up partial responses for this survey and IP after successful submission
+            session_id = request.data.get('session_id', '')
+            if session_id:
+                # Mark partial responses as completed instead of deleting them
+                PartialSurveyResponse.objects.filter(
+                    survey=survey,
+                    ip_address=ip_address,
+                    session_id=session_id,
+                    is_completed=False
+                ).update(is_completed=True)
+                print(f"Marked partial responses as completed for session {session_id}")
+            
             return Response({
                 'message': 'Survey response submitted successfully',
                 'response_id': survey_response.id
@@ -172,5 +185,76 @@ def submit_survey_response(request, survey_id):
     except Exception as e:
         return Response({
             'error': 'Failed to submit survey response',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def save_partial_response(request, survey_id, question_id):
+    """Save a partial response when user clicks Next on a specific question"""
+    try:
+        survey = get_object_or_404(Survey, id=survey_id, is_active=True)
+        question = get_object_or_404(Question, id=question_id, survey=survey)
+        
+        # Get client information
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        session_id = request.data.get('session_id', '')  # Get session ID from frontend
+        
+        # Get the answer from request data
+        answer = request.data.get('answer')
+        if not answer:
+            return Response({
+                'error': 'Answer is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Prepare the data for serializer
+        response_data = {
+            'survey': survey.id,
+            'question': question.id,
+            'answer': answer,
+            'answer_type': question.question_type,
+            'ip_address': ip_address,
+            'user_agent': user_agent,
+            'session_id': session_id
+        }
+        
+        # Create or update the partial response
+        serializer = PartialSurveyResponseSerializer(data=response_data)
+        
+        if serializer.is_valid():
+            # Check if a partial response already exists for this survey, question, IP, and session
+            existing_response = PartialSurveyResponse.objects.filter(
+                survey=survey,
+                question=question,
+                ip_address=ip_address,
+                session_id=session_id,
+                is_completed=False  # Only update incomplete responses
+            ).first()
+            
+            if existing_response:
+                # Update existing response
+                existing_response.answer = answer
+                existing_response.user_agent = user_agent
+                existing_response.save()
+                partial_response = existing_response
+            else:
+                # Create new response
+                partial_response = serializer.save()
+            
+            return Response({
+                'message': 'Partial response saved successfully',
+                'response_id': partial_response.id,
+                'question_id': question.id,
+                'answer': answer,
+                'session_id': session_id
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        return Response({
+            'error': 'Failed to save partial response',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

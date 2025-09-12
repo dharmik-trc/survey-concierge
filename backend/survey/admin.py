@@ -2,7 +2,7 @@ from django.contrib import admin
 from django import forms
 from django.utils.safestring import mark_safe
 import json
-from .models import Survey, Question, SurveyResponse, QuestionResponse, QUESTION_HIERARCHY
+from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse, QUESTION_HIERARCHY
 
 class SubfieldValidationWidget(forms.Widget):
     """User-friendly widget for editing subfield validations with dropdowns and buttons."""
@@ -343,16 +343,29 @@ class QuestionAdminForm(forms.ModelForm):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    list_display = ['title', 'created_at', 'updated_at', 'is_active']
-    list_filter = ['is_active', 'created_at']
+    list_display = ['title', 'created_at', 'updated_at', 'is_active', 'store_basic_details']
+    list_filter = ['is_active', 'store_basic_details', 'created_at']
     search_fields = ['title', 'description']
     readonly_fields = ['created_at', 'updated_at']
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('title', 'description', 'logo_url', 'concierge_logo_url')
+        }),
+        ('Settings', {
+            'fields': ('is_active', 'store_basic_details'),
+            'description': 'store_basic_details: Enable storing basic details (like email) when users click Next on specific questions'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     form = QuestionAdminForm
-    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'order']
-    list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'survey']
+    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'store_on_next', 'order']
+    list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'store_on_next', 'survey']
     search_fields = ['question_text', 'survey__title']
     ordering = ['survey', 'order']
     
@@ -426,3 +439,26 @@ class QuestionResponseAdmin(admin.ModelAdmin):
     
     def has_add_permission(self, request):
         return False  # Responses should only be created via API
+
+
+@admin.register(PartialSurveyResponse)
+class PartialSurveyResponseAdmin(admin.ModelAdmin):
+    list_display = ['question', 'survey', 'get_answer_display', 'answer_type', 'ip_address', 'session_id', 'is_completed', 'created_at']
+    list_filter = ['question__primary_type', 'question__secondary_type', 'is_completed', 'created_at', 'survey']
+    search_fields = ['question__question_text', 'answer', 'ip_address', 'session_id']
+    readonly_fields = ['survey', 'question', 'answer', 'answer_type', 'ip_address', 'user_agent', 'session_id', 'is_completed', 'created_at', 'updated_at']
+    
+    def get_answer_display(self, obj):
+        if obj.answer_type in ['text', 'email', 'number']:
+            return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
+        elif obj.answer_type == 'rating':
+            return f"Rating: {obj.answer}"
+        elif obj.answer_type in ['multiple_choice', 'checkbox']:
+            if isinstance(obj.answer, list):
+                return f"Choices: {', '.join(map(str, obj.answer))}"
+            return f"Choice: {obj.answer}"
+        return "No answer"
+    get_answer_display.short_description = 'Answer'
+    
+    def has_add_permission(self, request):
+        return False  # Partial responses should only be created via API

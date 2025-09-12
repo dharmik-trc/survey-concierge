@@ -18,6 +18,7 @@ export interface Question {
   has_comment_box: boolean;
   comment_box_rows: number;
   comment_box_label?: string | null;
+  store_on_next: boolean;
   options?: string[];
   section_title?: string | null;
   subfields?: string[];
@@ -46,6 +47,7 @@ export interface Survey {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  store_basic_details: boolean;
   questions: Question[];
 }
 
@@ -132,11 +134,37 @@ class ApiService {
   // Submit survey responses
   async submitSurveyResponse(
     surveyId: string,
-    responses: SurveyResponse
+    responses: SurveyResponse,
+    sessionId?: string
   ): Promise<SubmitResponse> {
     return this.request<SubmitResponse>(`/surveys/${surveyId}/submit/`, {
       method: "POST",
-      body: JSON.stringify({ responses }),
+      body: JSON.stringify({ responses, session_id: sessionId }),
+    });
+  }
+
+  // Save partial response when user clicks Next
+  async savePartialResponse(
+    surveyId: string,
+    questionId: number,
+    answer: any,
+    sessionId?: string
+  ): Promise<{
+    message: string;
+    response_id: string;
+    question_id: number;
+    answer: any;
+    session_id: string;
+  }> {
+    return this.request<{
+      message: string;
+      response_id: string;
+      question_id: number;
+      answer: any;
+      session_id: string;
+    }>(`/surveys/${surveyId}/questions/${questionId}/save-partial/`, {
+      method: "POST",
+      body: JSON.stringify({ answer, session_id: sessionId }),
     });
   }
 }

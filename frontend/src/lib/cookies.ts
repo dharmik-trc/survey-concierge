@@ -8,6 +8,7 @@ export interface CookieData {
   currentSectionIndex: number;
   otherTexts: Record<string, string>;
   timestamp: number;
+  sessionId?: string; // Add session ID to track partial responses
 }
 
 export const cookieUtils = {
@@ -81,5 +82,32 @@ export const cookieUtils = {
    */
   hasSurveyProgress: (surveyId: string): boolean => {
     return cookieUtils.getSurveyProgress(surveyId) !== null;
+  },
+
+  /**
+   * Generate a unique session ID for tracking partial responses
+   */
+  generateSessionId: (): string => {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  },
+
+  /**
+   * Get or create session ID for a survey
+   */
+  getOrCreateSessionId: (surveyId: string): string => {
+    const progress = cookieUtils.getSurveyProgress(surveyId);
+    if (progress?.sessionId) {
+      return progress.sessionId;
+    }
+
+    // Generate new session ID and save it
+    const newSessionId = cookieUtils.generateSessionId();
+    if (progress) {
+      // Update existing progress with session ID
+      progress.sessionId = newSessionId;
+      cookieUtils.saveSurveyProgress(surveyId, progress);
+    }
+
+    return newSessionId;
   },
 };
