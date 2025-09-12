@@ -1,27 +1,21 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+import os
 
 class Command(BaseCommand):
-    help = 'Creates a superuser with predefined credentials'
+    help = 'Create a superuser for admin access'
 
     def handle(self, *args, **options):
-        username = 'admin'
-        email = 'admin@gmail.com'
-        password = '123'
+        username = os.getenv('ADMIN_USERNAME', 'admin')
+        email = os.getenv('ADMIN_EMAIL', 'admin@example.com')
+        password = os.getenv('ADMIN_PASSWORD', '123')
         
         if User.objects.filter(username=username).exists():
             self.stdout.write(
-                self.style.WARNING(f'Superuser "{username}" already exists.')
+                self.style.WARNING(f'Superuser "{username}" already exists')
             )
-            return
-        
-        user = User.objects.create_superuser(username, email, password)
-        self.stdout.write(
-            self.style.SUCCESS(f'Superuser "{username}" created successfully!')
-        )
-        self.stdout.write(f'Username: {username}')
-        self.stdout.write(f'Password: {password}')
-        self.stdout.write(f'Email: {email}')
-        self.stdout.write(
-            self.style.SUCCESS('You can now login at http://localhost:9000/admin/')
-        ) 
+        else:
+            User.objects.create_superuser(username, email, password)
+            self.stdout.write(
+                self.style.SUCCESS(f'Successfully created superuser "{username}"')
+            )
