@@ -63,6 +63,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -198,8 +199,8 @@ STATICFILES_FINDERS = [
 ]
 
 # WhiteNoise configuration for serving static files
-# Temporarily disabled for debugging
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Use simpler storage for better compatibility
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Logging configuration
 LOGGING = {

@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.conf import settings
+from django.conf.urls.static import static
 
 def admin_test(request):
     """Test admin functionality"""
@@ -31,3 +33,7 @@ urlpatterns = [
     path('admin-test/', admin_test, name='admin_test'),
     path('api/survey/', include('survey.urls')),
 ]
+
+# Serve static files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
