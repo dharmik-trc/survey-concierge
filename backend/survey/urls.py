@@ -6,10 +6,12 @@ from .views import (
     questions_by_survey, 
     question_detail,
     submit_survey_response,
-    save_partial_response
+    save_partial_response,
+    health_check
 )
 
 urlpatterns = [
+    path('health/', health_check, name='health_check'),
     path('upload_excel/', upload_excel, name='upload_excel'),
     path('surveys/', survey_list, name='survey_list'),
     path('surveys/<uuid:survey_id>/', survey_detail, name='survey_detail'),

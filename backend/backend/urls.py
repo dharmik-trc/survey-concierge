@@ -16,8 +16,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+
+def admin_test(request):
+    """Test admin functionality"""
+    return JsonResponse({
+        'admin_available': True,
+        'admin_url': '/admin/',
+        'message': 'Admin panel should be accessible'
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('admin-test/', admin_test, name='admin_test'),
     path('api/survey/', include('survey.urls')),
 ]
