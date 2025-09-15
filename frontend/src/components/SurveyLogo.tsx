@@ -31,7 +31,7 @@ export default function SurveyLogo({
           <Image
             src={logoSrcToUse}
             alt="Survey Company Logo"
-            width={100}
+            width={300}
             height={100}
             className={`object-contain ${sizePx}`}
             priority
