@@ -7,7 +7,7 @@ import {
   Question,
   optionUtils,
   OTHER_OPTION,
-  NONE_OPTION,
+  DEFAULT_NONE_OPTION,
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
@@ -589,6 +589,10 @@ export default function SurveyPage({
       // Sanitize form_fields answers: ensure proper data types
       const sanitizedResponses: SurveyResponse = {};
       for (const [qid, ans] of Object.entries(responses)) {
+        // Skip comment box responses - they should be handled separately
+        if (qid.endsWith("_comment")) {
+          continue;
+        }
         const question = survey?.questions.find((q) => String(q.id) === qid);
         if (question?.question_type === "multiple_choice") {
           const otherOption = question.options?.find((opt) =>
@@ -731,6 +735,18 @@ export default function SurveyPage({
           continue;
         }
       }
+
+      // Add comment box responses separately
+      for (const [qid, comment] of Object.entries(responses)) {
+        if (
+          qid.endsWith("_comment") &&
+          comment &&
+          String(comment).trim() !== ""
+        ) {
+          sanitizedResponses[qid] = comment;
+        }
+      }
+
       const result = await apiService.submitSurveyResponse(
         surveyId,
         sanitizedResponses,
@@ -776,7 +792,7 @@ export default function SurveyPage({
     const value = responses[question.id];
     const error = validationErrors[question.id];
 
-    const inputClasses = `w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-sm sm:text-base ${
+    const inputClasses = `w-full px-2 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base ${
       error
         ? "border-red-500 focus:ring-red-500 focus:border-red-500"
         : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
@@ -906,10 +922,14 @@ export default function SurveyPage({
           optionUtils.getOptionsWithSpecialHandling(question);
 
         const otherOption = OTHER_OPTION;
-        const noneOption = NONE_OPTION;
+        const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
+        const exclusiveOption = question.exclusive_column;
         const selectedValues = Array.isArray(value) ? value : [];
         const isOtherSelected = selectedValues.includes(otherOption);
         const isNoneSelected = selectedValues.includes(noneOption);
+        const isExclusiveSelected = exclusiveOption
+          ? selectedValues.includes(exclusiveOption)
+          : false;
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
           setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
@@ -921,30 +941,32 @@ export default function SurveyPage({
         ) => {
           let newValues = [...selectedValues];
 
-          if (selectedOption === noneOption) {
-            // If "None of the Above" is checked, clear all other selections
+          // Check if this is an exclusive option (Other, or custom exclusive)
+          // NOTA is only exclusive if it's specifically set as the exclusive column
+          const isExclusiveOption =
+            selectedOption === otherOption ||
+            (exclusiveOption && selectedOption === exclusiveOption);
+
+          if (isExclusiveOption) {
+            // If any exclusive option is checked, clear all other selections
             if (isChecked) {
-              newValues = [noneOption];
+              newValues = [selectedOption];
               setOtherText("");
             } else {
               newValues = [];
-            }
-          } else if (selectedOption === otherOption) {
-            // If "Other, please specify" is checked, clear all other selections
-            if (isChecked) {
-              newValues = [otherOption];
-            } else {
-              newValues = [];
-              setOtherText("");
             }
           } else {
-            // If any other option is selected and "None of the Above" or "Other" was previously selected, remove them
-            if (isNoneSelected) {
+            // If any non-exclusive option is selected, remove all exclusive options
+            // Only remove NOTA if it's set as the exclusive column
+            if (isNoneSelected && exclusiveOption === noneOption) {
               newValues = newValues.filter((v) => v !== noneOption);
             }
             if (isOtherSelected) {
               newValues = newValues.filter((v) => v !== otherOption);
               setOtherText("");
+            }
+            if (isExclusiveSelected && exclusiveOption) {
+              newValues = newValues.filter((v) => v !== exclusiveOption);
             }
 
             if (isChecked) {
@@ -995,7 +1017,7 @@ export default function SurveyPage({
                       }
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
+                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
                       {option}
                     </span>
                   </label>
@@ -1046,9 +1068,9 @@ export default function SurveyPage({
           // Two column layout
           return (
             <div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {columns.map((column, colIndex) => (
-                  <div key={colIndex} className="space-y-3">
+                  <div key={colIndex} className="space-y-2 sm:space-y-3">
                     {column.map((option) => (
                       <label
                         key={option}
@@ -1079,7 +1101,7 @@ export default function SurveyPage({
                           }
                           className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         />
-                        <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
+                        <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
                           {option}
                         </span>
                       </label>
@@ -1140,7 +1162,8 @@ export default function SurveyPage({
           optionUtils.getOptionsWithSpecialHandling(question);
 
         const otherOption = OTHER_OPTION;
-        const noneOption = NONE_OPTION;
+        const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
+        const exclusiveOption = question.exclusive_column;
         const isOtherSelected = value === otherOption;
         const isNoneSelected = value === noneOption;
         const otherText = otherTexts[question.id] || "";
@@ -1149,21 +1172,18 @@ export default function SurveyPage({
 
         // Handle option selection with mutual exclusion logic
         const handleOptionChange = (selectedOption: string) => {
-          // If "None of the Above" is selected, clear other selections
-          if (selectedOption === noneOption) {
-            handleResponseChange(question.id, noneOption);
+          // Check if this is an exclusive option (Other, or custom exclusive)
+          // NOTA is only exclusive if it's specifically set as the exclusive column
+          const isExclusiveOption =
+            selectedOption === otherOption ||
+            (exclusiveOption && selectedOption === exclusiveOption);
+
+          if (isExclusiveOption) {
+            // If any exclusive option is selected, clear other text
+            handleResponseChange(question.id, selectedOption);
             setOtherText("");
-          }
-          // If "Other, please specify" is selected, clear other text if switching from another option
-          else if (selectedOption === otherOption) {
-            handleResponseChange(question.id, otherOption);
-            // Keep existing other text if already selected, clear if switching from another option
-            if (!isOtherSelected) {
-              setOtherText("");
-            }
-          }
-          // If any other option is selected, clear "Other" text
-          else {
+          } else {
+            // If any non-exclusive option is selected, clear "Other" text
             handleResponseChange(question.id, selectedOption);
             setOtherText("");
           }
@@ -1254,7 +1274,7 @@ export default function SurveyPage({
                       }
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
-                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-sm sm:text-base">
+                    <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
                       {option}
                     </span>
                   </label>
@@ -1309,7 +1329,7 @@ export default function SurveyPage({
                     {column.map((option) => (
                       <label
                         key={option}
-                        className="flex items-center p-2 sm:p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                        className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
                       >
                         <input
                           type="radio"
@@ -1333,7 +1353,7 @@ export default function SurveyPage({
                           }
                           className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                         />
-                        <span className="ml-3 text-gray-700 font-medium">
+                        <span className="ml-3 text-gray-700 font-medium text-xs sm:text-base">
                           {option}
                         </span>
                       </label>
@@ -1434,7 +1454,7 @@ export default function SurveyPage({
                         }
                         className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
-                      <span className="ml-3 text-gray-700 font-medium">
+                      <span className="ml-3 text-gray-700 font-medium text-xs sm:text-base">
                         {option}
                       </span>
                     </label>
@@ -1492,7 +1512,7 @@ export default function SurveyPage({
         return (
           <div>
             <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-200 rounded-lg">
+              <table className="w-full border border-gray-200 rounded-lg">
                 <thead>{/* No header row */}</thead>
                 <tbody>
                   {subfields.map((subfield, idx) => {
@@ -1523,10 +1543,10 @@ export default function SurveyPage({
 
                       return (
                         <tr key={subfield}>
-                          <td className="px-4 py-2 text-gray-800">
+                          <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-base font-medium w-1/2">
                             {subfield}
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-2 sm:px-4 py-2 w-1/2">
                             <input
                               type="number"
                               className={inputClasses + " bg-gray-100"}
@@ -1540,8 +1560,10 @@ export default function SurveyPage({
                     }
                     return (
                       <tr key={subfield}>
-                        <td className="px-4 py-2 text-gray-800">{subfield}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-base font-medium w-1/2">
+                          {subfield}
+                        </td>
+                        <td className="px-2 sm:px-4 py-2 w-1/2">
                           <input
                             type={
                               validation?.type === "email"
@@ -1720,7 +1742,7 @@ export default function SurveyPage({
                   {question.columns?.map((col) => (
                     <th
                       key={col}
-                      className="px-4 py-2 text-sm font-semibold text-gray-700 text-center whitespace-normal"
+                      className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
                       style={{ minWidth: 120, maxWidth: 140, width: 130 }}
                     >
                       {col}
@@ -1731,13 +1753,13 @@ export default function SurveyPage({
               <tbody>
                 {question.rows.map((row) => (
                   <tr key={row}>
-                    <td className="px-4 py-2 text-gray-800 font-medium">
+                    <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
                       {row}
                     </td>
                     {question.columns?.map((col) => (
                       <td
                         key={col}
-                        className="px-4 py-2 text-center"
+                        className="px-2 sm:px-4 py-2 text-center"
                         style={{ minWidth: 120, maxWidth: 140, width: 130 }}
                       >
                         <input
@@ -1800,7 +1822,7 @@ export default function SurveyPage({
                   {question.columns?.map((col) => (
                     <th
                       key={col}
-                      className="px-4 py-2 text-sm font-semibold text-gray-700 text-center whitespace-normal"
+                      className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
                       style={{ minWidth: 120, maxWidth: 140, width: 130 }}
                     >
                       {col}
@@ -1811,13 +1833,13 @@ export default function SurveyPage({
               <tbody>
                 {question.rows.map((row) => (
                   <tr key={row}>
-                    <td className="px-4 py-2 text-gray-800 font-medium">
+                    <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
                       {row}
                     </td>
                     {question.columns?.map((col) => (
                       <td
                         key={col}
-                        className="px-4 py-2 text-center"
+                        className="px-2 sm:px-4 py-2 text-center"
                         style={{ minWidth: 120, maxWidth: 140, width: 130 }}
                       >
                         <input
@@ -2026,7 +2048,9 @@ export default function SurveyPage({
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-6"></div>
-          <p className="text-gray-600 text-lg font-medium">Loading survey...</p>
+          <p className="text-gray-600 text-sm sm:text-lg font-medium">
+            Loading survey...
+          </p>
         </div>
       </div>
     );
@@ -2155,7 +2179,7 @@ export default function SurveyPage({
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span className="text-blue-800 text-sm font-medium">
+                    <span className="text-blue-800 text-xs sm:text-base font-medium">
                       Welcome back! Your previous progress has been restored.
                     </span>
                   </div>
@@ -2171,10 +2195,10 @@ export default function SurveyPage({
               {/* Progress Bar */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-base font-medium text-gray-700">
                     Question {currentSectionIndex + 1} of {sections.length}
                   </span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-xs sm:text-base text-gray-500">
                     {Math.round((currentSectionIndex / sections.length) * 100)}%
                     Complete
                   </span>
@@ -2198,7 +2222,7 @@ export default function SurveyPage({
                 <div className="mb-8">
                   {sections[currentSectionIndex].title.toLowerCase() !==
                     "other" && (
-                    <h2 className="text-gray-600 text-sm sm:text-base mb-4 sm:mb-6 font-medium">
+                    <h2 className="text-gray-600 text-xs sm:text-base mb-4 sm:mb-6 font-medium">
                       {sections[currentSectionIndex].title}
                     </h2>
                   )}
@@ -2210,7 +2234,7 @@ export default function SurveyPage({
                     return (
                       <div key={question.id} className="mb-6 sm:mb-8 relative">
                         <div className="mb-3 sm:mb-4 flex flex-col items-start">
-                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 leading-relaxed">
+                          <h3 className="text-sm sm:text-lg font-semibold text-gray-900 leading-relaxed">
                             <span className="text-gray-900 font-bold">
                               {globalIdx + 1}.
                             </span>{" "}
@@ -2235,12 +2259,12 @@ export default function SurveyPage({
                         {question.has_comment_box && (
                           <div className="mt-4">
                             {question.comment_box_label && (
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <label className="block text-xs sm:text-base font-medium text-gray-700 mb-2">
                                 {question.comment_box_label}
                               </label>
                             )}
                             <textarea
-                              className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-sm sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                               rows={question.comment_box_rows || 3}
                               placeholder="Enter your comments..."
                               value={

@@ -14,7 +14,9 @@ export interface Question {
   order: number;
   randomize_options: boolean;
   has_none_option: boolean;
+  none_option_text?: string | null;
   has_other_option: boolean;
+  exclusive_column?: string | null;
   has_comment_box: boolean;
   comment_box_rows: number;
   comment_box_label?: string | null;
@@ -173,7 +175,7 @@ export const apiService = new ApiService();
 
 // Constants for special options
 export const OTHER_OPTION = "Other, please specify";
-export const NONE_OPTION = "None of the Above";
+export const DEFAULT_NONE_OPTION = "None of the Above";
 
 // Simplified utility functions for option handling
 export const optionUtils = {
@@ -201,7 +203,8 @@ export const optionUtils = {
 
     // Add "None of the Above" if enabled (always last)
     if (question.has_none_option) {
-      finalOptions.push(NONE_OPTION);
+      const noneText = question.none_option_text || DEFAULT_NONE_OPTION;
+      finalOptions.push(noneText);
     }
 
     return {

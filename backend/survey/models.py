@@ -68,7 +68,11 @@ class Question(models.Model):
     
     # Special option controls
     has_none_option = models.BooleanField(default=False, help_text='Add "None of the Above" option (always appears last)')
+    none_option_text = models.CharField(max_length=200, blank=True, null=True, help_text='Custom text for "None of the Above" option (defaults to "None of the Above" if empty)')
     has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
+    
+    # Grid-specific controls
+    exclusive_column = models.CharField(max_length=200, blank=True, null=True, help_text='Column name that should be exclusive (only one option can be selected per row)')
     
     # Comment box (separate from Other option)
     has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')

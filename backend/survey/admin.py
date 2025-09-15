@@ -275,6 +275,26 @@ class QuestionAdminForm(forms.ModelForm):
             )
         )
         
+        # Make exclusive_column a dropdown populated from options field
+        if 'exclusive_column' in self.fields:
+            self.fields['exclusive_column'] = forms.ChoiceField(
+                choices=[('', '---------')],
+                required=False,
+                help_text='Select which option should be exclusive (only one option can be selected per row). First add options above, then select one here.'
+            )
+            
+            # Populate choices from options field
+            if self.instance and self.instance.pk:
+                options = self.instance.options
+                if options and isinstance(options, list):
+                    option_choices = [('', '---------')] + [(opt, opt) for opt in options]
+                    
+                    # Add NOTA option if it exists
+                    if self.instance.none_option_text:
+                        option_choices.append((self.instance.none_option_text, self.instance.none_option_text))
+                    
+                    self.fields['exclusive_column'].choices = option_choices
+        
         # Add custom widget for subfield validations
         if 'subfield_validations' in self.fields:
             self.fields['subfield_validations'].widget = SubfieldValidationWidget()
@@ -364,10 +384,44 @@ class SurveyAdmin(admin.ModelAdmin):
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     form = QuestionAdminForm
-    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'store_on_next', 'order']
+    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'exclusive_column', 'store_on_next', 'order']
     list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'store_on_next', 'survey']
     search_fields = ['question_text', 'survey__title']
     ordering = ['survey', 'order']
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('survey', 'question_text', 'primary_type', 'secondary_type', 'is_required', 'order')
+        }),
+        ('Options & Choices', {
+            'fields': ('options', 'randomize_options'),
+        }),
+        ('None of the Above', {
+            'fields': ('has_none_option', 'none_option_text'),
+        }),
+        ('Exclusive Column', {
+            'fields': ('exclusive_column',),
+        }),
+         ('Other (please specify)', {
+             'fields': ('has_other_option',),
+         }),
+        ('Grid Settings', {
+            'fields': ('rows', 'columns'),
+        }),
+        ('Form Fields', {
+            'fields': ('subfields', 'subfield_validations'),
+        }),
+        ('Additional Features', {
+            'fields': ('has_comment_box', 'comment_box_label'),
+        }),
+        ('Store on Next', {
+            'fields': ('store_on_next',),
+        }),
+        ('Grouping', {
+            'fields': ('section_title',),
+            'classes': ('collapse',)
+        }),
+    )
     
     class Media:
         js = ('admin/js/question_admin.js',)

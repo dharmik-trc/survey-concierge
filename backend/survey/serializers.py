@@ -18,7 +18,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'has_other_option', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'none_option_text', 'has_other_option', 'exclusive_column', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
@@ -84,6 +84,7 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                                     return False
                             return True
                         else:
+                            # For single answers, validate the actual answer
                             return is_valid_choice(actual_answer)  # Recursively validate the actual answer
                     
                     if isinstance(choice, dict) and 'other' in choice:
@@ -93,6 +94,9 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         return True
                     # Allow "None of the Above" if the question has this option enabled
                     if question.has_none_option and str(choice) == "None of the Above":
+                        return True
+                    # Allow custom NOTA text if the question has this option enabled
+                    if question.has_none_option and question.none_option_text and str(choice) == question.none_option_text:
                         return True
                     # Allow custom 'Other' values for 'Other, please specify' (legacy string format)
                     if str(choice).startswith('Other:'):
