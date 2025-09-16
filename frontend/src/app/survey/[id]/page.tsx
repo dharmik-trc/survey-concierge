@@ -925,7 +925,11 @@ export default function SurveyPage({
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
         const exclusiveOption = question.exclusive_column;
         const selectedValues = Array.isArray(value) ? value : [];
-        const isOtherSelected = selectedValues.includes(otherOption);
+        const isOtherSelected =
+          selectedValues.includes(otherOption) ||
+          selectedValues.some(
+            (v) => typeof v === "string" && v.startsWith("Other:")
+          );
         const isNoneSelected = selectedValues.includes(noneOption);
         const isExclusiveSelected = exclusiveOption
           ? selectedValues.includes(exclusiveOption)
@@ -1164,7 +1168,9 @@ export default function SurveyPage({
         const otherOption = OTHER_OPTION;
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
         const exclusiveOption = question.exclusive_column;
-        const isOtherSelected = value === otherOption;
+        const isOtherSelected =
+          value === otherOption ||
+          (typeof value === "string" && value.startsWith("Other:"));
         const isNoneSelected = value === noneOption;
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
