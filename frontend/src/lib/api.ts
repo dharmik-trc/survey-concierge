@@ -175,7 +175,7 @@ export const apiService = new ApiService();
 
 // Constants for special options
 export const OTHER_OPTION = "Other, please specify";
-export const DEFAULT_NONE_OPTION = "None of the Above";
+export const DEFAULT_NONE_OPTION = "None of the above";
 
 // Simplified utility functions for option handling
 export const optionUtils = {

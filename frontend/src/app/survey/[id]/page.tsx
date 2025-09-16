@@ -48,14 +48,14 @@ const validateSubfield = (
     case "positive_number":
       const positiveNum = parseFloat(stringValue);
       if (isNaN(positiveNum) || positiveNum < 0) {
-        return `${fieldName} must be a positive number`;
+        return `${fieldName} must be 0 or a positive number`;
       }
       break;
 
     case "negative_number":
       const negativeNum = parseFloat(stringValue);
       if (isNaN(negativeNum) || negativeNum > 0) {
-        return `${fieldName} must be a negative number`;
+        return `${fieldName} must be 0 or a negative number`;
       }
       break;
 
