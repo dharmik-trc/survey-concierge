@@ -945,10 +945,10 @@ export default function SurveyPage({
         ) => {
           let newValues = [...selectedValues];
 
-          // Check if this is an exclusive option (Other, or custom exclusive)
+          // Check if this is an exclusive option (custom exclusive only)
           // NOTA is only exclusive if it's specifically set as the exclusive column
+          // Other option is NOT exclusive - it can be selected with other options
           const isExclusiveOption =
-            selectedOption === otherOption ||
             (exclusiveOption && selectedOption === exclusiveOption);
 
           if (isExclusiveOption) {
@@ -1178,10 +1178,10 @@ export default function SurveyPage({
 
         // Handle option selection with mutual exclusion logic
         const handleOptionChange = (selectedOption: string) => {
-          // Check if this is an exclusive option (Other, or custom exclusive)
+          // Check if this is an exclusive option (custom exclusive only)
           // NOTA is only exclusive if it's specifically set as the exclusive column
+          // Other option is NOT exclusive - it can be selected with other options
           const isExclusiveOption =
-            selectedOption === otherOption ||
             (exclusiveOption && selectedOption === exclusiveOption);
 
           if (isExclusiveOption) {
