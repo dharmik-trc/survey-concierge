@@ -2204,10 +2204,10 @@ export default function SurveyPage({
 
               {/* Progress Bar */}
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs sm:text-base font-medium text-gray-700">
+                <div className="flex items-center justify-end mb-2">
+                  {/* <span className="text-xs sm:text-base font-medium text-gray-700">
                     Question {currentSectionIndex + 1} of {sections.length}
-                  </span>
+                  </span> */}
                   <span className="text-xs sm:text-base text-gray-500">
                     {Math.round((currentSectionIndex / sections.length) * 100)}%
                     Complete
