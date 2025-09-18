@@ -965,10 +965,6 @@ export default function SurveyPage({
             if (isNoneSelected && exclusiveOption === noneOption) {
               newValues = newValues.filter((v) => v !== noneOption);
             }
-            if (isOtherSelected) {
-              newValues = newValues.filter((v) => v !== otherOption);
-              setOtherText("");
-            }
             if (isExclusiveSelected && exclusiveOption) {
               newValues = newValues.filter((v) => v !== exclusiveOption);
             }
@@ -980,7 +976,15 @@ export default function SurveyPage({
               }
             } else {
               // Remove the option
-              newValues = newValues.filter((v) => v !== selectedOption);
+              if (selectedOption === otherOption) {
+                // Remove both raw 'Other' and any 'Other: ...' value
+                newValues = newValues.filter(
+                  (v) => v !== otherOption && !(typeof v === "string" && v.startsWith("Other:"))
+                );
+                setOtherText("");
+              } else {
+                newValues = newValues.filter((v) => v !== selectedOption);
+              }
             }
           }
 
