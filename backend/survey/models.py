@@ -68,16 +68,16 @@ class Question(models.Model):
     
     # Special option controls
     has_none_option = models.BooleanField(default=False, help_text='Add "None of the Above" option (always appears last)')
-    none_option_text = models.CharField(max_length=200, blank=True, null=True, help_text='Custom text for "None of the Above" option (defaults to "None of the Above" if empty)')
+    none_option_text = models.CharField(max_length=999, blank=True, null=True, help_text='Custom text for "None of the Above" option (defaults to "None of the Above" if empty)')
     has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
     
     # Grid-specific controls
-    exclusive_column = models.CharField(max_length=200, blank=True, null=True, help_text='Column name that should be exclusive (only one option can be selected per row)')
+    exclusive_column = models.CharField(max_length=999, blank=True, null=True, help_text='Column name that should be exclusive (only one option can be selected per row)')
     
     # Comment box (separate from Other option)
     has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')
     comment_box_rows = models.IntegerField(default=3, help_text='Number of rows for comment box (1-10)')
-    comment_box_label = models.CharField(max_length=200, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
+    comment_box_label = models.CharField(max_length=999, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
     
     # Basic details storage
     store_on_next = models.BooleanField(default=False, help_text='Store this question\'s answer when user clicks Next (only works if survey has store_basic_details enabled)')
@@ -88,7 +88,7 @@ class Question(models.Model):
     options = models.JSONField(blank=True, null=True)
 
     # Extra structures
-    section_title = models.CharField(max_length=200, blank=True, null=True)
+    section_title = models.CharField(max_length=999, blank=True, null=True)
     subfields = models.JSONField(blank=True, null=True)
     subfield_validations = models.JSONField(blank=True, null=True, help_text='Validation rules for each subfield: {"field_name": {"type": "positive_number|negative_number|email|text", "required": true}}')
     rows = models.JSONField(blank=True, null=True)
