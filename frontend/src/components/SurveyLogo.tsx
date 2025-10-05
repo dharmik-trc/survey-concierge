@@ -19,9 +19,10 @@ export default function SurveyLogo({
     lg: 112,
   }[size];
 
-  // Use default TSC rectangle logo if no survey logo is provided
-  const defaultLogoSrc = "/logos/TSC_Logo_Rectangle_Without_BG.png";
-  const logoSrcToUse = logoSrc || defaultLogoSrc;
+  // Don't render anything if no logo is provided
+  if (!logoSrc) {
+    return null;
+  }
 
   return (
     <div className={`flex items-center space-x-3 ${className}`}>
@@ -29,7 +30,7 @@ export default function SurveyLogo({
       <div className="flex items-center">
         <div className="rounded-lg p-0 mr-2">
           <Image
-            src={logoSrcToUse}
+            src={logoSrc}
             alt="Survey Company Logo"
             width={300}
             height={100}

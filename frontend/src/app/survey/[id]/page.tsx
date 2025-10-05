@@ -949,7 +949,7 @@ export default function SurveyPage({
           // NOTA is only exclusive if it's specifically set as the exclusive column
           // Other option is NOT exclusive - it can be selected with other options
           const isExclusiveOption =
-            (exclusiveOption && selectedOption === exclusiveOption);
+            exclusiveOption && selectedOption === exclusiveOption;
 
           if (isExclusiveOption) {
             // If any exclusive option is checked, clear all other selections
@@ -979,7 +979,9 @@ export default function SurveyPage({
               if (selectedOption === otherOption) {
                 // Remove both raw 'Other' and any 'Other: ...' value
                 newValues = newValues.filter(
-                  (v) => v !== otherOption && !(typeof v === "string" && v.startsWith("Other:"))
+                  (v) =>
+                    v !== otherOption &&
+                    !(typeof v === "string" && v.startsWith("Other:"))
                 );
                 setOtherText("");
               } else {
@@ -1186,7 +1188,7 @@ export default function SurveyPage({
           // NOTA is only exclusive if it's specifically set as the exclusive column
           // Other option is NOT exclusive - it can be selected with other options
           const isExclusiveOption =
-            (exclusiveOption && selectedOption === exclusiveOption);
+            exclusiveOption && selectedOption === exclusiveOption;
 
           if (isExclusiveOption) {
             // If any exclusive option is selected, clear other text
@@ -1579,16 +1581,16 @@ export default function SurveyPage({
                               validation?.type === "email"
                                 ? "email"
                                 : validation?.type?.includes("number")
-                                  ? "number"
-                                  : "text"
+                                ? "number"
+                                : "text"
                             }
                             className={inputClasses}
                             placeholder={
                               validation?.type === "email"
                                 ? `Enter email for ${subfield}`
                                 : validation?.type?.includes("number")
-                                  ? `Enter Response`
-                                  : `Enter ${subfield}`
+                                ? `Enter Response`
+                                : `Enter ${subfield}`
                             }
                             value={
                               value &&
@@ -2135,10 +2137,14 @@ export default function SurveyPage({
         <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-1 sm:py-1">
           <div className="flex items-center justify-between">
             {/* Survey Company Logo on the left */}
-            <SurveyLogo size="md" logoSrc={survey?.logo_url} />
+            <div className="flex-shrink-0">
+              <SurveyLogo size="md" logoSrc={survey?.logo_url} />
+            </div>
 
             {/* TSC Concierge Logo on the right */}
-            <ConciergeLogo size="md" />
+            <div className="flex-shrink-0 ml-auto">
+              <ConciergeLogo size="md" />
+            </div>
           </div>
         </div>
       </header>
@@ -2320,8 +2326,8 @@ export default function SurveyPage({
                     {submitting && currentSectionIndex === sections.length - 1
                       ? "Submitting..."
                       : currentSectionIndex === sections.length - 1
-                        ? "Submit Survey"
-                        : "Save & Next"}
+                      ? "Submit Survey"
+                      : "Save & Next"}
                   </button>
                 </div>
               </form>
