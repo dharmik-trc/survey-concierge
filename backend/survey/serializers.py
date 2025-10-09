@@ -362,4 +362,4 @@ class PartialSurveyResponseSerializer(serializers.ModelSerializer):
                 
         elif question_type == 'number':
             if isinstance(answer, str) and len(answer) > MAX_NUMBER_LENGTH:
-                raise serializers.ValidationError(f"Number cannot exceed {MAX_NUMBER_LENGTH} characters") 
+                raise serializers.ValidationError(f"Number cannot exceed {MAX_NUMBER_LENGTH} characters")

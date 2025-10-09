@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { apiService, SurveyListItem } from "../../lib/api";
-import ConciergeLogo from "../../components/ConciergeLogo";
+import { apiService, SurveyListItem } from "@/lib/api";
+import ConciergeLogo from "@/components/ConciergeLogo";
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [exportingResponses, setExportingResponses] = useState(false);
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
@@ -75,6 +76,18 @@ export default function Dashboard() {
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
       console.error("Failed to copy link:", err);
+    }
+  };
+
+  const exportResponses = async (surveyId: string) => {
+    try {
+      setExportingResponses(true);
+      await apiService.exportSurveyResponses(surveyId);
+    } catch (err) {
+      console.error("Failed to export survey responses:", err);
+      alert("Failed to export survey responses");
+    } finally {
+      setExportingResponses(false);
     }
   };
 
@@ -218,14 +231,14 @@ export default function Dashboard() {
               {surveys.map((survey) => (
                 <div
                   key={survey.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 flex flex-col"
                 >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <h3 className="text-xl font-semibold text-gray-900 line-clamp-2 leading-tight">
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900 line-clamp-2 leading-tight flex-1 min-w-0">
                         {survey.title}
                       </h3>
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-800">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 whitespace-nowrap flex-shrink-0">
                         {survey.question_count} questions
                       </span>
                     </div>
@@ -256,49 +269,78 @@ export default function Dashboard() {
                       </span>
                     </div>
 
-                    <div className="flex gap-3">
-                      <a
-                        href={`/survey/${survey.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 text-center transition-all duration-200 shadow-sm hover:shadow-md"
-                      >
-                        Take Survey
-                      </a>
-                      <button
-                        onClick={() => copySurveyLink(survey.id)}
-                        className="px-4 py-3 bg-gray-50 text-gray-700 text-sm rounded-lg hover:bg-gray-100 transition-colors duration-200 border border-gray-200"
-                        title="Copy survey link"
-                      >
-                        {copiedId === survey.id ? (
-                          <span className="flex items-center">
+                    <div className="flex flex-col gap-3 mt-auto">
+                      <div className="flex gap-3">
+                        <a
+                          href={`/survey/${survey.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 text-center transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                          Take Survey
+                        </a>
+                        <button
+                          onClick={() => copySurveyLink(survey.id)}
+                          className="px-4 py-3 bg-gray-50 text-gray-700 text-sm rounded-lg hover:bg-gray-100 transition-colors duration-200 border border-gray-200"
+                          title="Copy survey link"
+                        >
+                          {copiedId === survey.id ? (
+                            <span className="flex items-center">
+                              <svg
+                                className="w-4 h-4 mr-1 text-green-600"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              Copied
+                            </span>
+                          ) : (
                             <svg
-                              className="w-4 h-4 mr-1 text-green-600"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
                             >
                               <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.0"
                               />
                             </svg>
-                            Copied
-                          </span>
+                          )}
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => exportResponses(survey.id)}
+                        disabled={exportingResponses}
+                        className="w-full px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-lg hover:bg-green-100 transition-colors duration-200 border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        title="Export all survey responses as Excel (3 tabs: Partial, Completed, All)"
+                      >
+                        {exportingResponses ? (
+                          "Exporting..."
                         ) : (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                            />
-                          </svg>
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                            Export Responses
+                          </>
                         )}
                       </button>
                     </div>

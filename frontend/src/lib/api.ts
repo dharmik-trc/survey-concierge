@@ -169,6 +169,46 @@ class ApiService {
       body: JSON.stringify({ answer, session_id: sessionId }),
     });
   }
+
+  // Export all survey responses as Excel file (includes partial, completed, and all responses in separate tabs)
+  async exportSurveyResponses(surveyId: string): Promise<void> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/responses/export/`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to export responses: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // Get the blob and create a download link
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from Content-Disposition header or use default with timestamp
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    // Fallback filename with human-readable date/time
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    let filename = `Survey_Export_${dateStr}_${timeStr}.xlsx`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
 }
 
 export const apiService = new ApiService();
