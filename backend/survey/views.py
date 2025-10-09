@@ -10,8 +10,14 @@ from django.shortcuts import get_object_or_404
 import openpyxl
 import io
 
-from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse
-from .serializers import SurveySerializer, SurveyListSerializer, QuestionSerializer, SurveyResponseSerializer, PartialSurveyResponseSerializer
+from .models import Survey, Question, PartialSurveyResponse
+from .serializers import (
+    SurveySerializer, 
+    SurveyListSerializer, 
+    QuestionSerializer, 
+    SurveyResponseSerializer, 
+    PartialSurveyResponseSerializer
+)
 
 # Create your views here.
 
@@ -268,3 +274,4 @@ def save_partial_response(request, survey_id, question_id):
             'error': 'Failed to save partial response',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
