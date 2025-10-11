@@ -32,7 +32,7 @@ exports/
 
 - `collect_session_data(survey)` - Gather partial responses by session
 - `merge_completed_responses(...)` - Merge complete survey submissions
-- `analyze_question_subfields(sessions)` - Identify questions needing sub-columns
+- `analyze_question_subfields(sessions, questions)` - Identify questions needing sub-columns and multi-select questions
 - `filter_sessions_by_completion(sessions)` - Split partial vs completed
 
 **Use Cases**:
@@ -47,8 +47,9 @@ exports/
 **Key Functions**:
 
 - `create_worksheet_with_data(...)` - Main worksheet creation orchestrator
-- `build_excel_headers(...)` - Create two-row header structure
+- `build_excel_headers(...)` - Create two-row header structure with multi-select support
 - `write_data_rows(...)` - Populate worksheet with session data
+- `write_multi_select_answer(...)` - Handle multi-select questions with True markers
 - `write_complex_answer(...)` - Handle multi-column questions
 - `format_worksheet(...)` - Apply formatting (widths, freeze panes, etc.)
 
@@ -132,9 +133,10 @@ def export_csv_responses(request, survey_id):
 
 2. **Smart Column Handling**
 
-   - Automatically detects complex questions (forms, grids)
+   - Automatically detects complex questions (forms, grids, multi-select)
    - Creates sub-columns for dictionary/object answers
-   - Two-row header: Main question + sub-fields
+   - Multi-select questions: Each option gets its own column (Q1_1, Q1_2, etc.) with X markers
+   - Two-row header: Main question + sub-fields/options
 
 3. **Sequential Question Numbering**
 
@@ -146,7 +148,17 @@ def export_csv_responses(request, survey_id):
    - Green fill for completed sessions
    - Yellow fill for partial sessions
 
-5. **Professional Formatting**
+5. **Multi-Select Column Expansion**
+
+   For multi-select questions (multiple_choices type):
+
+   - Each option gets its own column
+   - Column headers format: `Q1_1: Option Name`, `Q1_2: Option Name`, etc.
+   - Selected options marked with 'True', unselected left empty
+   - Example: If Q1 has 6 options, it creates columns Q1_1 through Q1_6
+   - This enables easy data analysis and pivot tables in Excel
+
+6. **Professional Formatting**
    - Frozen headers for easy scrolling
    - Text wrapping enabled
    - Proper column widths
@@ -160,6 +172,8 @@ When modifying this module, test:
 - [ ] Only completed responses
 - [ ] Mix of partial and completed
 - [ ] Questions with sub-fields (forms, grids)
+- [ ] Multi-select questions with various options selected
+- [ ] Multi-select questions with special options (Other, None of the Above)
 - [ ] Questions with simple answers (text, single choice)
 - [ ] Large datasets (100+ sessions)
 - [ ] Special characters in answers
