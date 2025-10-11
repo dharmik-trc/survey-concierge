@@ -120,8 +120,8 @@ def export_survey_responses(request, survey_id):
         # Step 4: Filter sessions by completion status
         partial_sessions, completed_sessions = filter_sessions_by_completion(sessions)
         
-        # Step 5: Analyze questions to identify sub-columns (using all sessions)
-        question_subfields = analyze_question_subfields(sessions)
+        # Step 5: Analyze questions to identify sub-columns and multi-select questions (using all sessions)
+        question_subfields, multi_select_questions = analyze_question_subfields(sessions, all_questions)
         
         # Step 6: Create Excel workbook with 3 tabs
         wb = openpyxl.Workbook()
@@ -135,7 +135,7 @@ def export_survey_responses(request, survey_id):
         if partial_sessions:
             create_worksheet_with_data(
                 wb, "Partial Responses", partial_sessions,
-                all_questions, question_subfields, styles
+                all_questions, question_subfields, multi_select_questions, styles
             )
         else:
             create_empty_sheet(wb, "Partial Responses", "No partial responses found")
@@ -144,7 +144,7 @@ def export_survey_responses(request, survey_id):
         if completed_sessions:
             create_worksheet_with_data(
                 wb, "Completed Responses", completed_sessions,
-                all_questions, question_subfields, styles
+                all_questions, question_subfields, multi_select_questions, styles
             )
         else:
             create_empty_sheet(wb, "Completed Responses", "No completed responses found")
@@ -152,7 +152,7 @@ def export_survey_responses(request, survey_id):
         # Tab 3: All Responses
         create_worksheet_with_data(
             wb, "All Responses", sessions,
-            all_questions, question_subfields, styles
+            all_questions, question_subfields, multi_select_questions, styles
         )
         
         # Set "All Responses" as the active sheet (first tab user sees)

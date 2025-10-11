@@ -94,7 +94,7 @@ def merge_completed_responses(survey, sessions, completed_sessions_info):
             sessions[session_id]['last_activity'] = survey_response.submitted_at
 
 
-def get_subfields_for_answer(answer):
+def get_subfields_for_answer(answer, question=None):
     """
     Detect if an answer contains sub-fields (dict structure).
     
@@ -103,6 +103,7 @@ def get_subfields_for_answer(answer):
     
     Args:
         answer: The answer value (could be string, dict, list, etc.)
+        question: Optional Question object to check for multi-select type
     
     Returns:
         list: List of subfield names if answer is a dict, None otherwise
@@ -122,35 +123,66 @@ def get_subfields_for_answer(answer):
     return list(answer.keys())
 
 
-def analyze_question_subfields(sessions):
+def analyze_question_subfields(sessions, questions):
     """
     Analyze all session responses to determine which questions have sub-columns.
     
     This function scans all answers across all sessions to identify questions
     that return dictionary/object answers and need multiple sub-columns in Excel.
+    Also handles multi-select questions by creating a column for each option.
     
     Args:
         sessions: Dict of session data
+        questions: QuerySet or list of Question objects
     
     Returns:
-        dict: Mapping of question_id to sorted list of subfield names
+        tuple: (question_subfields, multi_select_questions)
+            - question_subfields: Dict mapping question_id to sorted list of subfield names
+            - multi_select_questions: Dict mapping question_id to list of options
     """
     question_subfields = {}
+    multi_select_questions = {}
     
+    # Create a map of question_id to question object for quick lookup
+    question_map = {q.id: q for q in questions}
+    
+    # First, identify multi-select questions and their options
+    for question in questions:
+        if question.secondary_type == 'multiple_choices' and question.options:
+            # Store all options for this multi-select question
+            options = question.options.copy()
+            
+            # Add special options if they exist
+            if question.has_other_option:
+                options.append('Other')
+            if question.has_none_option:
+                none_text = question.none_option_text if question.none_option_text else 'None of the Above'
+                options.append(none_text)
+            
+            multi_select_questions[question.id] = options
+    
+    # Then analyze answers for other subfield types (forms, grids, etc.)
     for session_id, session_data in sessions.items():
         for question_id, answer in session_data['questions'].items():
+            # Skip multi-select questions - they're handled separately
+            if question_id in multi_select_questions:
+                continue
+                
             if answer is not None:
-                subfields = get_subfields_for_answer(answer)
+                question = question_map.get(question_id)
+                subfields = get_subfields_for_answer(answer, question)
                 if subfields:
                     if question_id not in question_subfields:
                         question_subfields[question_id] = set()
                     question_subfields[question_id].update(subfields)
     
     # Convert sets to sorted lists for consistent column ordering
-    return {
+    question_subfields = {
         qid: sorted(list(subfields))
         for qid, subfields in question_subfields.items()
     }
+    
+    return question_subfields, multi_select_questions
 
 
 def filter_sessions_by_completion(sessions):

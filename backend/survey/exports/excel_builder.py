@@ -11,18 +11,20 @@ from openpyxl.styles import Alignment
 from .excel_styles import create_excel_styles
 
 
-def build_excel_headers(ws, all_questions, question_subfields, styles):
+def build_excel_headers(ws, all_questions, question_subfields, multi_select_questions, styles):
     """
     Build two-row header structure for Excel worksheet.
     
     Creates a professional two-row header where:
     - Row 1: Main question headers (merged across sub-columns if applicable)
     - Row 2: Sub-column headers for questions with multiple fields
+    - Multi-select questions: Each option gets its own column (Q1_1, Q1_2, etc.)
     
     Args:
         ws: Worksheet object
         all_questions: QuerySet or list of Question objects
         question_subfields: Dict mapping question_id to list of subfield names
+        multi_select_questions: Dict mapping question_id to list of options
         styles: Dict of style objects from create_excel_styles()
     
     Returns:
@@ -49,8 +51,37 @@ def build_excel_headers(ws, all_questions, question_subfields, styles):
         question_num += 1
         question_text = question.question_text
         
-        if question.id in question_subfields:
-            # Question with sub-columns
+        if question.id in multi_select_questions:
+            # Multi-select question - each option gets its own column
+            options = multi_select_questions[question.id]
+            start_col = col_num
+            end_col = col_num + len(options) - 1
+            question_column_map[question.id] = {'_type': 'multi_select', '_options': {}}
+            
+            # Row 1: Merged main question header
+            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+            main_cell = ws.cell(row=1, column=start_col)
+            main_cell.value = f"Q{question_num}: {question_text}"
+            main_cell.fill = styles['header_fill']
+            main_cell.font = styles['header_font']
+            main_cell.alignment = styles['header_alignment']
+            
+            # Style all merged cells
+            for col in range(start_col, end_col + 1):
+                ws.cell(row=1, column=col).fill = styles['header_fill']
+            
+            # Row 2: Option columns with Q#_# format
+            for idx, option in enumerate(options, 1):
+                cell = ws.cell(row=2, column=col_num)
+                cell.value = f"Q{question_num}_{idx}: {option}"
+                cell.fill = styles['subheader_fill']
+                cell.font = styles['subheader_font']
+                cell.alignment = styles['header_alignment']
+                question_column_map[question.id]['_options'][option] = col_num
+                col_num += 1
+                
+        elif question.id in question_subfields:
+            # Question with sub-columns (forms, grids, etc.)
             subfields = question_subfields[question.id]
             start_col = col_num
             end_col = col_num + len(subfields) - 1
@@ -143,6 +174,79 @@ def write_answer_to_cell(ws, row_num, col_idx, value, alignment):
     return cell
 
 
+def write_multi_select_answer(ws, row_num, answer, col_map, alignment):
+    """
+    Handle writing multi-select answers to individual option columns.
+    
+    For multi-select questions, each option gets its own column with a marker
+    (True) to indicate if that option was selected.
+    
+    Args:
+        ws: Worksheet object
+        row_num: Row number to write to
+        answer: The answer value (expected to be list, dict with 'answer', or other)
+        col_map: Dict with '_options' key mapping option names to column indices
+        alignment: Alignment object for cells
+    """
+    options_map = col_map.get('_options', {})
+    
+    # Extract the actual list of selected options
+    selected_options = []
+    
+    if isinstance(answer, list):
+        # Direct list of selected options
+        selected_options = answer
+    elif isinstance(answer, dict):
+        if 'answer' in answer:
+            # Comment+answer structure
+            inner_answer = answer.get('answer')
+            if isinstance(inner_answer, list):
+                selected_options = inner_answer
+            elif inner_answer:
+                selected_options = [inner_answer]
+        elif 'other' in answer:
+            # Other option with custom text
+            selected_options = ['Other']
+    elif answer:
+        # Single value
+        selected_options = [answer]
+    
+    # Write markers for each option
+    for option, col_idx in options_map.items():
+        # Check if this option was selected
+        is_selected = False
+        other_text = None
+        
+        for selected in selected_options:
+            # Handle both direct option match and dict-based "other" answers
+            if isinstance(selected, dict) and 'other' in selected:
+                if option.lower().startswith('other'):
+                    is_selected = True
+                    other_text = selected.get('other', '')
+                    break
+            elif str(selected) == str(option):
+                is_selected = True
+                break
+            # Handle "Other: custom text" format - match against "Other" option
+            elif isinstance(selected, str) and selected.startswith('Other:') and option.lower() == 'other':
+                is_selected = True
+                # Extract the custom text after "Other: "
+                other_text = selected[6:].strip()  # Remove "Other:" prefix
+                break
+        
+        # Write True for selected, empty for not selected
+        # For "Other" options, include the custom text
+        cell = ws.cell(row=row_num, column=col_idx)
+        if is_selected:
+            if other_text:
+                cell.value = f'True: {other_text}'
+            else:
+                cell.value = 'True'
+        else:
+            cell.value = ''
+        cell.alignment = alignment
+
+
 def write_complex_answer(ws, row_num, answer, col_map, alignment):
     """
     Handle writing complex dict answers to multiple sub-columns.
@@ -223,6 +327,9 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
                 if '_main' in col_map:
                     # Simple question - single column
                     write_answer_to_cell(ws, row_num, col_map['_main'], answer, alignment)
+                elif '_type' in col_map and col_map['_type'] == 'multi_select':
+                    # Multi-select question - spread across option columns
+                    write_multi_select_answer(ws, row_num, answer, col_map, alignment)
                 else:
                     # Complex question - multiple sub-columns
                     write_complex_answer(ws, row_num, answer, col_map, alignment)
@@ -230,6 +337,10 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
                 # Empty answer - fill with empty strings
                 if '_main' in col_map:
                     ws.cell(row=row_num, column=col_map['_main'], value='')
+                elif '_type' in col_map and col_map['_type'] == 'multi_select':
+                    # Empty multi-select - fill all option columns
+                    for col_idx in col_map.get('_options', {}).values():
+                        ws.cell(row=row_num, column=col_idx, value='')
                 else:
                     for col_idx in col_map.values():
                         ws.cell(row=row_num, column=col_idx, value='')
@@ -268,7 +379,7 @@ def format_worksheet(ws, last_activity_col):
     ws.freeze_panes = 'A3'
 
 
-def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question_subfields, styles):
+def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question_subfields, multi_select_questions, styles):
     """
     Create a complete worksheet with headers, data, and formatting.
     
@@ -280,6 +391,7 @@ def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question
         sessions: Dict of session data to include
         all_questions: List of Question objects
         question_subfields: Dict mapping question IDs to subfield names
+        multi_select_questions: Dict mapping question IDs to list of options
         styles: Dict of style objects
     
     Returns:
@@ -289,7 +401,7 @@ def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question
     
     # Build headers
     question_column_map, is_completed_col, last_activity_col = build_excel_headers(
-        ws, all_questions, question_subfields, styles
+        ws, all_questions, question_subfields, multi_select_questions, styles
     )
     
     # Write data rows
