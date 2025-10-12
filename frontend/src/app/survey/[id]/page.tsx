@@ -915,6 +915,118 @@ export default function SurveyPage({
           </div>
         );
 
+      case "slider":
+        const scaleMin = question.scale_min ?? 0;
+        const scaleMax = question.scale_max ?? 10;
+        const scaleStep = question.scale_step ?? 1;
+        const scaleMinLabel = question.scale_min_label || "";
+        const scaleMaxLabel = question.scale_max_label || "";
+        const currentValue = typeof value === "number" ? value : scaleMin;
+
+        return (
+          <div className="space-y-4">
+            <div className="px-2">
+              <input
+                type="range"
+                min={scaleMin}
+                max={scaleMax}
+                step={scaleStep}
+                value={currentValue}
+                onChange={(e) =>
+                  handleResponseChange(question.id, parseInt(e.target.value))
+                }
+                onBlur={() =>
+                  handleBlur(question.id, currentValue, questionType)
+                }
+                className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb"
+                style={{
+                  background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${
+                    ((currentValue - scaleMin) / (scaleMax - scaleMin)) * 100
+                  }%, #e5e7eb ${
+                    ((currentValue - scaleMin) / (scaleMax - scaleMin)) * 100
+                  }%, #e5e7eb 100%)`,
+                }}
+              />
+              <style jsx>{`
+                .slider-thumb {
+                  outline: none !important;
+                  border: none !important;
+                }
+                .slider-thumb:focus {
+                  outline: none !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
+                .slider-thumb::-webkit-slider-thumb {
+                  appearance: none;
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 50%;
+                  background: #6366f1;
+                  cursor: pointer;
+                  border: 3px solid white;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                }
+                .slider-thumb::-webkit-slider-thumb:focus {
+                  outline: none;
+                }
+                .slider-thumb::-moz-range-thumb {
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 50%;
+                  background: #6366f1;
+                  cursor: pointer;
+                  border: 3px solid white;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                }
+                .slider-thumb::-moz-range-thumb:focus {
+                  outline: none;
+                }
+              `}</style>
+            </div>
+
+            <div className="flex justify-between items-center px-2">
+              <div className="flex flex-col items-start">
+                <span className="text-2xl font-bold text-indigo-600">
+                  {currentValue}
+                </span>
+                {scaleMinLabel && (
+                  <span className="text-xs text-gray-500 mt-1">
+                    {scaleMinLabel}
+                  </span>
+                )}
+              </div>
+              {scaleMaxLabel && (
+                <span className="text-xs text-gray-500 text-right max-w-[150px]">
+                  {scaleMaxLabel}
+                </span>
+              )}
+            </div>
+
+            <div className="flex justify-between text-xs text-gray-400 px-2">
+              <span>{scaleMin}</span>
+              <span>{scaleMax}</span>
+            </div>
+
+            {error && (
+              <p className="text-red-500 text-sm mt-2 flex items-center">
+                <svg
+                  className="w-4 h-4 mr-1"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {error}
+              </p>
+            )}
+          </div>
+        );
+
       case "date":
         return (
           <div>
@@ -1879,103 +1991,6 @@ export default function SurveyPage({
 
       case "cross_matrix_checkbox":
       case "grid_multi":
-      case "ranking": {
-        if (!question.rows || !question.columns) return null;
-        const rawValue = responses[question.id];
-        // Type guard: only use rawValue if all values are arrays
-        const isValidMatrixCheckbox =
-          rawValue &&
-          typeof rawValue === "object" &&
-          !Array.isArray(rawValue) &&
-          Object.values(rawValue).every((v) => Array.isArray(v));
-        const matrixValue: { [row: string]: string[] } = isValidMatrixCheckbox
-          ? (rawValue as unknown as { [row: string]: string[] })
-          : {};
-        return (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border border-gray-200 rounded-lg">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2"></th>
-                  {question.columns?.map((col) => (
-                    <th
-                      key={col}
-                      className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
-                      style={{ minWidth: 120, maxWidth: 140, width: 130 }}
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {question.rows.map((row) => (
-                  <tr key={row}>
-                    <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
-                      {row}
-                    </td>
-                    {question.columns?.map((col) => (
-                      <td
-                        key={col}
-                        className="px-2 sm:px-4 py-2 text-center"
-                        style={{ minWidth: 120, maxWidth: 140, width: 130 }}
-                      >
-                        <input
-                          type="checkbox"
-                          name={`matrix-checkbox-${question.id}-${row}`}
-                          value={col}
-                          checked={
-                            Array.isArray(matrixValue[row]) &&
-                            matrixValue[row].includes(col)
-                          }
-                          onChange={(e) => {
-                            const prevRow = Array.isArray(matrixValue[row])
-                              ? matrixValue[row]
-                              : [];
-                            let nextRow: string[];
-                            if (e.target.checked) {
-                              nextRow = [...prevRow, col];
-                            } else {
-                              nextRow = prevRow.filter((v) => v !== col);
-                            }
-                            const next = { ...matrixValue, [row]: nextRow };
-                            // Ensure all rows are present as arrays
-                            question.rows?.forEach((r) => {
-                              if (!Array.isArray(next[r])) next[r] = [];
-                            });
-                            handleResponseChange(
-                              question.id,
-                              next as unknown as { [row: string]: string[] }
-                            );
-                          }}
-                          className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {error && (
-              <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {error}
-              </p>
-            )}
-          </div>
-        );
-      }
-
       default:
         return <p className="text-gray-500">Unsupported question type</p>;
     }

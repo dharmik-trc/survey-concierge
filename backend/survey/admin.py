@@ -271,7 +271,8 @@ class QuestionAdminForm(forms.ModelForm):
                 "Choose a secondary type that matches your selected primary type. "
                 "Open Text: text, paragraph, number, email, date, time. "
                 "Form: multiple_choices, radio, dropdown, form_fields, fields, yes_no. "
-                "Grid: grid_radio, grid_multi, ranking."
+                "Grid: grid_radio, grid_multi. "
+                "Scale: slider."
             )
         )
         
@@ -392,6 +393,10 @@ class QuestionAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('survey', 'question_text', 'primary_type', 'secondary_type', 'is_required', 'order')
+        }),
+        ('Scale/Rating Settings', {
+            'fields': ('scale_min', 'scale_max', 'scale_step', 'scale_min_label', 'scale_max_label'),
+            'description': 'For Slider questions. Defaults: 0-10 (perfect for NPS). Customize min/max for other scales (e.g., 1-5 stars). Add labels like "Not likely" / "Very likely".'
         }),
         ('Options & Choices', {
             'fields': ('options', 'randomize_options'),

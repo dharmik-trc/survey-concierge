@@ -18,7 +18,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'none_option_text', 'has_other_option', 'exclusive_column', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'none_option_text', 'has_other_option', 'exclusive_column', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'row_count', 'scale_min', 'scale_max', 'scale_step', 'scale_min_label', 'scale_max_label', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
@@ -68,6 +68,22 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         elif question_type == 'number':
             if answer and not self._is_valid_number(answer):
                 raise serializers.ValidationError("Please enter a valid number")
+        elif question_type == 'slider':
+            # Validate slider/scale answers
+            if answer is not None:
+                try:
+                    value = int(answer) if not isinstance(answer, int) else answer
+                    if value < question.scale_min or value > question.scale_max:
+                        raise serializers.ValidationError(
+                            f"Value must be between {question.scale_min} and {question.scale_max}"
+                        )
+                    # Check if value matches the step increment
+                    if (value - question.scale_min) % question.scale_step != 0:
+                        raise serializers.ValidationError(
+                            f"Value must be a multiple of {question.scale_step} starting from {question.scale_min}"
+                        )
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError("Please provide a valid number for the scale")
         elif question_type in ['multiple_choices', 'radio', 'dropdown', 'yes_no', 'fields']:
             if question.options and answer:
                 def is_valid_choice(choice):
@@ -160,7 +176,7 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                     if row in question.rows and value is not None and value != '':
                         if value not in question.columns:
                             raise serializers.ValidationError(f"Invalid column for row '{row}': {value}")
-        elif question_type in ['cross_matrix_checkbox', 'grid_multi', 'ranking']:
+        elif question_type in ['cross_matrix_checkbox', 'grid_multi']:
             # Cross matrix checkbox: answer must be a dict mapping rows to arrays of columns
             if not isinstance(answer, dict):
                 raise serializers.ValidationError("Cross matrix checkbox answer must be an object mapping rows to arrays of columns.")

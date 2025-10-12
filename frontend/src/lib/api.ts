@@ -21,6 +21,13 @@ export interface Question {
   comment_box_rows: number;
   comment_box_label?: string | null;
   store_on_next: boolean;
+  row_count: number;
+  // Slider/Scale fields
+  scale_min: number;
+  scale_max: number;
+  scale_step: number;
+  scale_min_label?: string | null;
+  scale_max_label?: string | null;
   options?: string[];
   section_title?: string | null;
   subfields?: string[];

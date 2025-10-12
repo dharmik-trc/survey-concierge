@@ -18,10 +18,12 @@ const QUESTION_HIERARCHY = {
     ["fields", "Custom Fields (Name, Address, etc.)"],
     ["yes_no", "Yes / No"],
   ],
+  scale: [
+    ["slider", "Slider / Rating Scale (0-10 default, fully customizable)"],
+  ],
   grid: [
     ["grid_radio", "Grid (Single Select per row)"],
     ["grid_multi", "Grid (Multi Select per row)"],
-    ["ranking", "Ranking"],
   ],
 };
 

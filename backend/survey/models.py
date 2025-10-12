@@ -20,10 +20,12 @@ QUESTION_HIERARCHY = {
         ("fields", "Custom Fields (Name, Address, etc.)"),
         ("yes_no", "Yes / No"),
     ],
+    "scale": [
+        ("slider", "Slider / Rating Scale (0-10 default, fully customizable)"),
+    ],
     "grid": [
         ("grid_radio", "Grid (Single Select per row)"),
         ("grid_multi", "Grid (Multi Select per row)"),
-        ("ranking", "Ranking"),
     ],
 }
 
@@ -46,6 +48,7 @@ class Question(models.Model):
     PRIMARY_TYPES = [
         ("open_text", "Open Text"),
         ("form", "Form"),
+        ("scale", "Scale/Rating"),
         ("grid", "Grid"),
     ]
 
@@ -83,6 +86,13 @@ class Question(models.Model):
     store_on_next = models.BooleanField(default=False, help_text='Store this question\'s answer when user clicks Next (only works if survey has store_basic_details enabled)')
     
     row_count = models.IntegerField(default=1, help_text='Number of rows for text questions')
+    
+    # Slider/Scale specific fields
+    scale_min = models.IntegerField(default=0, help_text='Minimum value for slider/scale (e.g., 0 for NPS)')
+    scale_max = models.IntegerField(default=10, help_text='Maximum value for slider/scale (e.g., 10 for NPS)')
+    scale_step = models.IntegerField(default=1, help_text='Step increment for slider (e.g., 1 for whole numbers)')
+    scale_min_label = models.CharField(max_length=100, default='Not at all likely', blank=True, help_text='Label for minimum value')
+    scale_max_label = models.CharField(max_length=100, default='Extremely likely', blank=True, help_text='Label for maximum value')
 
     # Options
     options = models.JSONField(blank=True, null=True)
