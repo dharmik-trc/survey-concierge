@@ -70,8 +70,8 @@ class Question(models.Model):
     randomize_options = models.BooleanField(default=False)
     
     # Special option controls
-    has_none_option = models.BooleanField(default=False, help_text='Add "None of the Above" option (always appears last)')
-    none_option_text = models.CharField(max_length=999, blank=True, null=True, help_text='Custom text for "None of the Above" option (defaults to "None of the Above" if empty)')
+    has_none_option = models.BooleanField(default=False, help_text='Add "None of the above" option (always appears last)')
+    none_option_text = models.CharField(max_length=999, blank=True, null=True, help_text='Custom text for "None of the above" option (defaults to "None of the above" if empty)')
     has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
     
     # Grid-specific controls

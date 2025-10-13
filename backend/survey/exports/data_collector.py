@@ -156,7 +156,7 @@ def analyze_question_subfields(sessions, questions):
             if question.has_other_option:
                 options.append('Other')
             if question.has_none_option:
-                none_text = question.none_option_text if question.none_option_text else 'None of the Above'
+                none_text = question.none_option_text if question.none_option_text else 'None of the above'
                 options.append(none_text)
             
             multi_select_questions[question.id] = options

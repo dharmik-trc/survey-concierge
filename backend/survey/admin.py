@@ -401,7 +401,7 @@ class QuestionAdmin(admin.ModelAdmin):
         ('Options & Choices', {
             'fields': ('options', 'randomize_options'),
         }),
-        ('None of the Above', {
+        ('None of the above', {
             'fields': ('has_none_option', 'none_option_text'),
         }),
         ('Exclusive Column', {

@@ -108,11 +108,11 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         return any(opt.lower().startswith('other') for opt in question.options)
                     if choice in question.options:
                         return True
-                    # Allow "None of the Above" if the question has this option enabled
-                    if question.has_none_option and str(choice) == "None of the Above":
+                    # Allow "None of the above" if the question has this option enabled (case-insensitive)
+                    if question.has_none_option and str(choice).lower() == "none of the above":
                         return True
-                    # Allow custom NOTA text if the question has this option enabled
-                    if question.has_none_option and question.none_option_text and str(choice) == question.none_option_text:
+                    # Allow custom NOTA text if the question has this option enabled (case-insensitive)
+                    if question.has_none_option and question.none_option_text and str(choice).lower() == question.none_option_text.lower():
                         return True
                     # Allow custom 'Other' values for 'Other, please specify' (legacy string format)
                     if str(choice).startswith('Other:'):
