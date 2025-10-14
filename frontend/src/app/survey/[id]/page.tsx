@@ -1123,11 +1123,12 @@ export default function SurveyPage({
         ) => {
           let newValues = [...selectedValues];
 
-          // Check if this is an exclusive option (custom exclusive only)
-          // NOTA is only exclusive if it's specifically set as the exclusive column
-          // Other option is NOT exclusive - it can be selected with other options
-          const isExclusiveOption =
+          // Check if this is "None of the above" - always exclusive
+          const isNoneOfTheAbove = selectedOption === noneOption;
+          // Check if this is a custom exclusive option
+          const isCustomExclusive =
             exclusiveOption && selectedOption === exclusiveOption;
+          const isExclusiveOption = isNoneOfTheAbove || isCustomExclusive;
 
           if (isExclusiveOption) {
             // If any exclusive option is checked, clear all other selections
@@ -1138,9 +1139,8 @@ export default function SurveyPage({
               newValues = [];
             }
           } else {
-            // If any non-exclusive option is selected, remove all exclusive options
-            // Only remove NOTA if it's set as the exclusive column
-            if (isNoneSelected && exclusiveOption === noneOption) {
+            // If any non-exclusive option is selected, remove "None of the above" and custom exclusive options
+            if (isNoneSelected) {
               newValues = newValues.filter((v) => v !== noneOption);
             }
             if (isExclusiveSelected && exclusiveOption) {
@@ -1594,17 +1594,23 @@ export default function SurveyPage({
       }
 
       case "fields": {
-        const otherOption = question.options?.find((opt) =>
-          opt.toLowerCase().includes("other")
-        );
+        // Get processed options with special handling (includes Other and None if enabled)
+        const randomizedOptions = getRandomizedOptions(question);
+        const { hasOtherOption, hasNoneOption } =
+          optionUtils.getOptionsWithSpecialHandling(question);
+
+        const otherOption = OTHER_OPTION;
+        const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
         const selectedValues = Array.isArray(value) ? value : [];
-        const isOtherChecked = otherOption
-          ? selectedValues.includes(otherOption)
-          : false;
+        const isOtherChecked =
+          selectedValues.includes(otherOption) ||
+          selectedValues.some(
+            (v) => typeof v === "string" && v.startsWith("Other:")
+          );
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
           setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
-        const optionPairs = chunkArray(question.options || [], 2);
+        const optionPairs = chunkArray(randomizedOptions, 2);
         return (
           <div>
             <div className="space-y-3">
@@ -1624,14 +1630,31 @@ export default function SurveyPage({
                         checked={selectedValues.includes(option)}
                         onChange={(e) => {
                           let newValues = Array.isArray(value) ? value : [];
+
+                          // Check if this is "None of the above" option
+                          const isNoneOfTheAbove = option === noneOption;
+                          console.log("isNoneOfTheAbove", isNoneOfTheAbove);
+
                           if (e.target.checked) {
-                            newValues = [...newValues, option];
+                            if (isNoneOfTheAbove) {
+                              // If "None of the above" is selected, clear all other options
+                              newValues = [option];
+                              setOtherText("");
+                            } else {
+                              // If any other option is selected, remove "None of the above"
+                              newValues = [
+                                ...newValues.filter((v) => v !== noneOption),
+                                option,
+                              ];
+                            }
                           } else {
                             newValues = newValues.filter((v) => v !== option);
                           }
+
                           if (option === otherOption && !e.target.checked) {
                             setOtherText("");
                           }
+
                           const safeValues: string[] = newValues.map((v) =>
                             typeof v === "object" && v !== null && "other" in v
                               ? `Other: ${(v as any).other}`
