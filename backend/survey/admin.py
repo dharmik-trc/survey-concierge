@@ -417,7 +417,7 @@ class QuestionAdmin(admin.ModelAdmin):
             'fields': ('subfields', 'subfield_validations'),
         }),
         ('Additional Features', {
-            'fields': ('has_comment_box', 'comment_box_label'),
+            'fields': ('has_comment_box', 'comment_box_label', 'comment_box_trigger_value'),
         }),
         ('Store on Next', {
             'fields': ('store_on_next',),

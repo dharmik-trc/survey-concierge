@@ -20,6 +20,7 @@ export interface Question {
   has_comment_box: boolean;
   comment_box_rows: number;
   comment_box_label?: string | null;
+  comment_box_trigger_value?: string | null;
   store_on_next: boolean;
   row_count: number;
   // Slider/Scale fields

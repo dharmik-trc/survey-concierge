@@ -81,6 +81,7 @@ class Question(models.Model):
     has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')
     comment_box_rows = models.IntegerField(default=3, help_text='Number of rows for comment box (1-10)')
     comment_box_label = models.CharField(max_length=999, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
+    comment_box_trigger_value = models.CharField(max_length=255, blank=True, null=True, help_text='Only show comment box when this answer is selected (e.g., "Yes"). Leave blank to always show comment box.')
     
     # Basic details storage
     store_on_next = models.BooleanField(default=False, help_text='Store this question\'s answer when user clicks Next (only works if survey has store_basic_details enabled)')

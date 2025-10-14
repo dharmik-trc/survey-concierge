@@ -2429,40 +2429,90 @@ export default function SurveyPage({
                         </div>
                         {renderQuestion(question)}
 
-                        {/* Comment Box - separate from Other option */}
-                        {question.has_comment_box && (
-                          <div className="mt-4">
-                            {question.comment_box_label && (
-                              <label className="block text-xs sm:text-base font-medium text-gray-700 mb-2">
-                                {question.comment_box_label}
-                              </label>
-                            )}
-                            <textarea
-                              className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                              rows={question.comment_box_rows || 3}
-                              placeholder="Enter your comments..."
-                              value={
-                                (responses[
-                                  `${question.id}_comment`
-                                ] as string) || ""
+                        {/* Comment Box - can be conditional or always shown */}
+                        {question.has_comment_box &&
+                          (() => {
+                            const currentResponse = responses[question.id];
+                            const triggerValue = question.comment_box_trigger_value;
+
+                            // If trigger value is set, only show comment box when that value is selected
+                            if (triggerValue) {
+                              const responseText =
+                                typeof currentResponse === "string"
+                                  ? currentResponse.toLowerCase()
+                                  : "";
+                              const trigger = triggerValue.toLowerCase();
+                              
+                              // Check if response contains the trigger value (case-insensitive)
+                              if (!responseText.includes(trigger)) {
+                                return null;
                               }
-                              maxLength={99999}
-                              onChange={(e) =>
-                                handleResponseChange(
-                                  `${question.id}_comment`,
-                                  e.target.value
-                                )
-                              }
-                              onBlur={(e) =>
-                                handleBlur(
-                                  `${question.id}_comment`,
-                                  e.target.value,
-                                  "text"
-                                )
-                              }
-                            />
-                          </div>
-                        )}
+                            }
+
+                            // Determine if this should be an email field (if trigger value contains "email")
+                            const isEmailField = triggerValue && triggerValue.toLowerCase().includes("email");
+
+                            return (
+                              <div className="mt-4">
+                                {question.comment_box_label && (
+                                  <label className="block text-xs sm:text-base font-medium text-gray-700 mb-2">
+                                    {question.comment_box_label}
+                                  </label>
+                                )}
+                                {isEmailField ? (
+                                  <input
+                                    type="email"
+                                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                                    placeholder="Enter your email address..."
+                                    value={
+                                      (responses[
+                                        `${question.id}_comment`
+                                      ] as string) || ""
+                                    }
+                                    maxLength={99999}
+                                    onChange={(e) =>
+                                      handleResponseChange(
+                                        `${question.id}_comment`,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={(e) =>
+                                      handleBlur(
+                                        `${question.id}_comment`,
+                                        e.target.value,
+                                        "email"
+                                      )
+                                    }
+                                  />
+                                ) : (
+                                  <textarea
+                                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                                    rows={question.comment_box_rows || 3}
+                                    placeholder="Enter your comments..."
+                                    value={
+                                      (responses[
+                                        `${question.id}_comment`
+                                      ] as string) || ""
+                                    }
+                                    maxLength={99999}
+                                    onChange={(e) =>
+                                      handleResponseChange(
+                                        `${question.id}_comment`,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={(e) =>
+                                      handleBlur(
+                                        `${question.id}_comment`,
+                                        e.target.value,
+                                        "text"
+                                      )
+                                    }
+                                  />
+                                )}
+                              </div>
+                            );
+                          })()}
                       </div>
                     );
                   })}
