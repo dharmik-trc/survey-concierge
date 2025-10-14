@@ -18,14 +18,14 @@ class QuestionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'none_option_text', 'has_other_option', 'exclusive_column', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'store_on_next', 'row_count', 'scale_min', 'scale_max', 'scale_step', 'scale_min_label', 'scale_max_label', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
+        fields = ['id', 'question_text', 'primary_type', 'secondary_type', 'question_type', 'is_required', 'order', 'randomize_options', 'has_none_option', 'none_option_text', 'has_other_option', 'exclusive_column', 'has_comment_box', 'comment_box_rows', 'comment_box_label', 'comment_box_trigger_value', 'store_on_next', 'row_count', 'scale_min', 'scale_max', 'scale_step', 'scale_min_label', 'scale_max_label', 'options', 'section_title', 'subfields', 'subfield_validations', 'rows', 'columns']
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     
     class Meta:
         model = Survey
-        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'store_basic_details', 'questions']
+        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'store_basic_details', 'thank_you_message', 'questions']
 
 class SurveyListSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()

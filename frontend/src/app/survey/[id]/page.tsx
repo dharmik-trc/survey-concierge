@@ -30,6 +30,60 @@ interface ValidationErrors {
   [questionId: string | number]: string;
 }
 
+// Helper function to parse markdown-like formatting in question text (supports nesting)
+const parseQuestionText = (text: string, keyPrefix = ""): React.ReactNode[] => {
+  const parts: React.ReactNode[] = [];
+  let currentIndex = 0;
+  let keyCounter = 0;
+
+  // Regex to match **bold**, __underline__, or *italic* (ordered by precedence)
+  const regex = /\*\*(.+?)\*\*|__(.+?)__|_(.+?)_|\*(.+?)\*/g;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > currentIndex) {
+      parts.push(text.substring(currentIndex, match.index));
+    }
+
+    const key = `${keyPrefix}-${keyCounter++}`;
+
+    // Add formatted text with recursive parsing for nested formatting
+    if (match[1]) {
+      // Bold text (matched **)
+      parts.push(
+        <strong key={`bold-${key}`} className="font-bold">
+          {parseQuestionText(match[1], `${key}-inner`)}
+        </strong>
+      );
+    } else if (match[2]) {
+      // Underline text (matched __)
+      parts.push(
+        <u key={`underline-${key}`} className="underline">
+          {parseQuestionText(match[2], `${key}-inner`)}
+        </u>
+      );
+    } else if (match[3] || match[4]) {
+      // Italic text (matched _ or *)
+      const italicText = match[3] || match[4];
+      parts.push(
+        <em key={`italic-${key}`} className="italic">
+          {parseQuestionText(italicText, `${key}-inner`)}
+        </em>
+      );
+    }
+
+    currentIndex = regex.lastIndex;
+  }
+
+  // Add remaining text
+  if (currentIndex < text.length) {
+    parts.push(text.substring(currentIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+};
+
 // Validation function for individual subfields
 const validateSubfield = (
   fieldName: string,
@@ -510,15 +564,28 @@ export default function SurveyPage({
       currentValue !== undefined
     ) {
       try {
+        // Combine main answer with comment if it exists
+        let answerToSave: any = currentValue;
+        const commentKey = `${currentQuestion.id}_comment`;
+        const commentValue = responses[commentKey];
+
+        if (commentValue && String(commentValue).trim()) {
+          // Store as an object with both answer and comment
+          answerToSave = {
+            answer: currentValue,
+            comment: commentValue,
+          };
+        }
+
         await apiService.savePartialResponse(
           survey.id,
           currentQuestion.id,
-          currentValue,
+          answerToSave,
           sessionId
         );
         console.log(
           `Partial response saved for question ${currentQuestion.id}:`,
-          currentValue
+          answerToSave
         );
       } catch (error) {
         console.error("Failed to save partial response:", error);
@@ -1123,11 +1190,12 @@ export default function SurveyPage({
         ) => {
           let newValues = [...selectedValues];
 
-          // Check if this is an exclusive option (custom exclusive only)
-          // NOTA is only exclusive if it's specifically set as the exclusive column
-          // Other option is NOT exclusive - it can be selected with other options
-          const isExclusiveOption =
+          // Check if this is "None of the above" - always exclusive
+          const isNoneOfTheAbove = selectedOption === noneOption;
+          // Check if this is a custom exclusive option
+          const isCustomExclusive =
             exclusiveOption && selectedOption === exclusiveOption;
+          const isExclusiveOption = isNoneOfTheAbove || isCustomExclusive;
 
           if (isExclusiveOption) {
             // If any exclusive option is checked, clear all other selections
@@ -1138,9 +1206,8 @@ export default function SurveyPage({
               newValues = [];
             }
           } else {
-            // If any non-exclusive option is selected, remove all exclusive options
-            // Only remove NOTA if it's set as the exclusive column
-            if (isNoneSelected && exclusiveOption === noneOption) {
+            // If any non-exclusive option is selected, remove "None of the above" and custom exclusive options
+            if (isNoneSelected) {
               newValues = newValues.filter((v) => v !== noneOption);
             }
             if (isExclusiveSelected && exclusiveOption) {
@@ -1594,17 +1661,23 @@ export default function SurveyPage({
       }
 
       case "fields": {
-        const otherOption = question.options?.find((opt) =>
-          opt.toLowerCase().includes("other")
-        );
+        // Get processed options with special handling (includes Other and None if enabled)
+        const randomizedOptions = getRandomizedOptions(question);
+        const { hasOtherOption, hasNoneOption } =
+          optionUtils.getOptionsWithSpecialHandling(question);
+
+        const otherOption = OTHER_OPTION;
+        const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
         const selectedValues = Array.isArray(value) ? value : [];
-        const isOtherChecked = otherOption
-          ? selectedValues.includes(otherOption)
-          : false;
+        const isOtherChecked =
+          selectedValues.includes(otherOption) ||
+          selectedValues.some(
+            (v) => typeof v === "string" && v.startsWith("Other:")
+          );
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
           setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
-        const optionPairs = chunkArray(question.options || [], 2);
+        const optionPairs = chunkArray(randomizedOptions, 2);
         return (
           <div>
             <div className="space-y-3">
@@ -1624,14 +1697,31 @@ export default function SurveyPage({
                         checked={selectedValues.includes(option)}
                         onChange={(e) => {
                           let newValues = Array.isArray(value) ? value : [];
+
+                          // Check if this is "None of the above" option
+                          const isNoneOfTheAbove = option === noneOption;
+                          console.log("isNoneOfTheAbove", isNoneOfTheAbove);
+
                           if (e.target.checked) {
-                            newValues = [...newValues, option];
+                            if (isNoneOfTheAbove) {
+                              // If "None of the above" is selected, clear all other options
+                              newValues = [option];
+                              setOtherText("");
+                            } else {
+                              // If any other option is selected, remove "None of the above"
+                              newValues = [
+                                ...newValues.filter((v) => v !== noneOption),
+                                option,
+                              ];
+                            }
                           } else {
                             newValues = newValues.filter((v) => v !== option);
                           }
+
                           if (option === otherOption && !e.target.checked) {
                             setOtherText("");
                           }
+
                           const safeValues: string[] = newValues.map((v) =>
                             typeof v === "object" && v !== null && "other" in v
                               ? `Other: ${(v as any).other}`
@@ -2066,15 +2156,29 @@ export default function SurveyPage({
               console.log("question", question);
               console.log("responses[question.id]", responses[question.id]);
               console.log("sessionId", sessionId);
+
+              // Combine main answer with comment if it exists
+              let answerToSave: any = responses[question.id];
+              const commentKey = `${question.id}_comment`;
+              const commentValue = responses[commentKey];
+
+              if (commentValue && String(commentValue).trim()) {
+                // Store as an object with both answer and comment
+                answerToSave = {
+                  answer: responses[question.id],
+                  comment: commentValue,
+                };
+              }
+
               await apiService.savePartialResponse(
                 survey.id,
                 question.id,
-                responses[question.id],
+                answerToSave,
                 sessionId
               );
               console.log(
                 `Partial response saved for question ${question.id}:`,
-                responses[question.id]
+                answerToSave
               );
             } catch (error) {
               console.error("Failed to save partial response:", error);
@@ -2177,9 +2281,14 @@ export default function SurveyPage({
   }
 
   if (submitted) {
+    // Use custom thank you message if available, otherwise use default
+    const thankYouMessage =
+      survey?.thank_you_message ||
+      "Your survey response has been submitted successfully.";
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-12 max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 sm:p-12 max-w-2xl w-full text-center">
           <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg
               className="w-10 h-10 text-white"
@@ -2194,8 +2303,8 @@ export default function SurveyPage({
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Thank You!</h2>
-          <p className="text-gray-600 mb-6">
-            Your survey response has been submitted successfully.
+          <p className="text-gray-600 mb-6 whitespace-pre-line">
+            {thankYouMessage}
           </p>
           <p className="text-gray-500 text-sm">
             You can now close this browser window.
@@ -2339,7 +2448,7 @@ export default function SurveyPage({
                               .split("\n")
                               .map((line, idx) => (
                                 <React.Fragment key={idx}>
-                                  {line}
+                                  {parseQuestionText(line)}
                                   <br />
                                 </React.Fragment>
                               ))}
@@ -2352,40 +2461,93 @@ export default function SurveyPage({
                         </div>
                         {renderQuestion(question)}
 
-                        {/* Comment Box - separate from Other option */}
-                        {question.has_comment_box && (
-                          <div className="mt-4">
-                            {question.comment_box_label && (
-                              <label className="block text-xs sm:text-base font-medium text-gray-700 mb-2">
-                                {question.comment_box_label}
-                              </label>
-                            )}
-                            <textarea
-                              className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                              rows={question.comment_box_rows || 3}
-                              placeholder="Enter your comments..."
-                              value={
-                                (responses[
-                                  `${question.id}_comment`
-                                ] as string) || ""
+                        {/* Comment Box - can be conditional or always shown */}
+                        {question.has_comment_box &&
+                          (() => {
+                            const currentResponse = responses[question.id];
+                            const triggerValue =
+                              question.comment_box_trigger_value;
+
+                            // If trigger value is set, only show comment box when that value is selected
+                            if (triggerValue) {
+                              const responseText =
+                                typeof currentResponse === "string"
+                                  ? currentResponse.toLowerCase()
+                                  : "";
+                              const trigger = triggerValue.toLowerCase();
+
+                              // Check if response contains the trigger value (case-insensitive)
+                              if (!responseText.includes(trigger)) {
+                                return null;
                               }
-                              maxLength={99999}
-                              onChange={(e) =>
-                                handleResponseChange(
-                                  `${question.id}_comment`,
-                                  e.target.value
-                                )
-                              }
-                              onBlur={(e) =>
-                                handleBlur(
-                                  `${question.id}_comment`,
-                                  e.target.value,
-                                  "text"
-                                )
-                              }
-                            />
-                          </div>
-                        )}
+                            }
+
+                            // Determine if this should be an email field (if trigger value contains "email")
+                            const isEmailField =
+                              triggerValue &&
+                              triggerValue.toLowerCase().includes("email");
+
+                            return (
+                              <div className="mt-4">
+                                {question.comment_box_label && (
+                                  <label className="block text-xs sm:text-base font-medium text-gray-700 mb-2">
+                                    {question.comment_box_label}
+                                  </label>
+                                )}
+                                {isEmailField ? (
+                                  <input
+                                    type="email"
+                                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                                    placeholder="Enter your email address..."
+                                    value={
+                                      (responses[
+                                        `${question.id}_comment`
+                                      ] as string) || ""
+                                    }
+                                    maxLength={99999}
+                                    onChange={(e) =>
+                                      handleResponseChange(
+                                        `${question.id}_comment`,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={(e) =>
+                                      handleBlur(
+                                        `${question.id}_comment`,
+                                        e.target.value,
+                                        "email"
+                                      )
+                                    }
+                                  />
+                                ) : (
+                                  <textarea
+                                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+                                    rows={question.comment_box_rows || 3}
+                                    placeholder="Enter your comments..."
+                                    value={
+                                      (responses[
+                                        `${question.id}_comment`
+                                      ] as string) || ""
+                                    }
+                                    maxLength={99999}
+                                    onChange={(e) =>
+                                      handleResponseChange(
+                                        `${question.id}_comment`,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={(e) =>
+                                      handleBlur(
+                                        `${question.id}_comment`,
+                                        e.target.value,
+                                        "text"
+                                      )
+                                    }
+                                  />
+                                )}
+                              </div>
+                            );
+                          })()}
                       </div>
                     );
                   })}
