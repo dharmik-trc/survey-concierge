@@ -65,9 +65,19 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         if question_type == 'email':
             if answer and not self._is_valid_email(answer):
                 raise serializers.ValidationError("Please enter a valid email address")
-        elif question_type == 'number':
+        elif question_type in ['number', 'positive_number', 'negative_number']:
             if answer and not self._is_valid_number(answer):
                 raise serializers.ValidationError("Please enter a valid number")
+            # Additional validation for positive/negative numbers
+            if answer:
+                try:
+                    num_value = float(answer)
+                    if question_type == 'positive_number' and num_value < 0:
+                        raise serializers.ValidationError("Please enter a positive number or zero")
+                    elif question_type == 'negative_number' and num_value > 0:
+                        raise serializers.ValidationError("Please enter a negative number or zero")
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError("Please enter a valid number")
         elif question_type == 'slider':
             # Validate slider/scale answers
             if answer is not None:
@@ -340,9 +350,19 @@ class PartialSurveyResponseSerializer(serializers.ModelSerializer):
         if question_type == 'email':
             if answer and not self._is_valid_email(answer):
                 raise serializers.ValidationError("Please enter a valid email address")
-        elif question_type == 'number':
+        elif question_type in ['number', 'positive_number', 'negative_number']:
             if answer and not self._is_valid_number(answer):
                 raise serializers.ValidationError("Please enter a valid number")
+            # Additional validation for positive/negative numbers
+            if answer:
+                try:
+                    num_value = float(answer)
+                    if question_type == 'positive_number' and num_value < 0:
+                        raise serializers.ValidationError("Please enter a positive number or zero")
+                    elif question_type == 'negative_number' and num_value > 0:
+                        raise serializers.ValidationError("Please enter a negative number or zero")
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError("Please enter a valid number")
         
         return data
     

@@ -327,6 +327,34 @@ export default function SurveyPage({
         }
         break;
 
+      case "positive_number":
+        if (!validateNumber(value)) {
+          console.log(
+            `Question ${questionId} positive number validation failed:`,
+            value
+          );
+          return "Please enter a valid number";
+        }
+        // Additional validation for positive numbers (including 0)
+        if (typeof value === "number" && value < 0) {
+          return "Please enter a positive number or zero";
+        }
+        break;
+
+      case "negative_number":
+        if (!validateNumber(value)) {
+          console.log(
+            `Question ${questionId} negative number validation failed:`,
+            value
+          );
+          return "Please enter a valid number";
+        }
+        // Additional validation for negative numbers (including 0)
+        if (typeof value === "number" && value > 0) {
+          return "Please enter a negative number or zero";
+        }
+        break;
+
       case "multiple_choices":
         if (Array.isArray(value)) {
           if (value.length === 0) {
@@ -940,13 +968,24 @@ export default function SurveyPage({
         );
 
       case "number":
+      case "positive_number":
+      case "negative_number":
+        const getNumberPlaceholder = () => {
+          if (questionType === "positive_number") {
+            return "Enter a positive number or zero...";
+          } else if (questionType === "negative_number") {
+            return "Enter a negative number or zero...";
+          }
+          return "Enter a number (positive or negative)...";
+        };
+
         return (
           <div>
             <input
               type="number"
               step="any"
               className={inputClasses}
-              placeholder="Enter a number (positive or negative)..."
+              placeholder={getNumberPlaceholder()}
               value={(value as number) || ""}
               onChange={(e) => {
                 const inputValue = e.target.value;

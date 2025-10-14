@@ -5,7 +5,9 @@ const QUESTION_HIERARCHY = {
   open_text: [
     ["text", "Short Text"],
     ["paragraph", "Paragraph / Long Text"],
-    ["number", "Number"],
+    ["number", "Number (All Numbers)"],
+    ["positive_number", "Positive Number (including 0)"],
+    ["negative_number", "Negative Number (including 0)"],
     ["email", "Email"],
     ["date", "Date"],
     ["time", "Time"],
