@@ -58,6 +58,7 @@ export interface Survey {
   updated_at: string;
   is_active: boolean;
   store_basic_details: boolean;
+  thank_you_message?: string | null;
   questions: Question[];
 }
 

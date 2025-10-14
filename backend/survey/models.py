@@ -40,6 +40,7 @@ class Survey(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     store_basic_details = models.BooleanField(default=False, help_text="Enable storing basic details (like email) when users click Next on specific questions")
+    thank_you_message = models.TextField(blank=True, null=True, help_text='Custom thank you message shown after survey submission. Leave blank for default message.')
     
     def __str__(self):
         return self.title

@@ -25,7 +25,7 @@ class SurveySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Survey
-        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'store_basic_details', 'questions']
+        fields = ['id', 'title', 'description', 'logo_url', 'concierge_logo_url', 'created_at', 'updated_at', 'is_active', 'store_basic_details', 'thank_you_message', 'questions']
 
 class SurveyListSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()

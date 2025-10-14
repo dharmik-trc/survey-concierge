@@ -2254,9 +2254,14 @@ export default function SurveyPage({
   }
 
   if (submitted) {
+    // Use custom thank you message if available, otherwise use default
+    const thankYouMessage =
+      survey?.thank_you_message ||
+      "Your survey response has been submitted successfully.";
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-12 max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 sm:p-12 max-w-2xl w-full text-center">
           <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg
               className="w-10 h-10 text-white"
@@ -2271,8 +2276,8 @@ export default function SurveyPage({
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Thank You!</h2>
-          <p className="text-gray-600 mb-6">
-            Your survey response has been submitted successfully.
+          <p className="text-gray-600 mb-6 whitespace-pre-line">
+            {thankYouMessage}
           </p>
           <p className="text-gray-500 text-sm">
             You can now close this browser window.
@@ -2433,7 +2438,8 @@ export default function SurveyPage({
                         {question.has_comment_box &&
                           (() => {
                             const currentResponse = responses[question.id];
-                            const triggerValue = question.comment_box_trigger_value;
+                            const triggerValue =
+                              question.comment_box_trigger_value;
 
                             // If trigger value is set, only show comment box when that value is selected
                             if (triggerValue) {
@@ -2442,7 +2448,7 @@ export default function SurveyPage({
                                   ? currentResponse.toLowerCase()
                                   : "";
                               const trigger = triggerValue.toLowerCase();
-                              
+
                               // Check if response contains the trigger value (case-insensitive)
                               if (!responseText.includes(trigger)) {
                                 return null;
@@ -2450,7 +2456,9 @@ export default function SurveyPage({
                             }
 
                             // Determine if this should be an email field (if trigger value contains "email")
-                            const isEmailField = triggerValue && triggerValue.toLowerCase().includes("email");
+                            const isEmailField =
+                              triggerValue &&
+                              triggerValue.toLowerCase().includes("email");
 
                             return (
                               <div className="mt-4">

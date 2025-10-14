@@ -370,7 +370,7 @@ class SurveyAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
     fieldsets = (
         ('Basic Information', {
-            'fields': ('title', 'description', 'logo_url', 'concierge_logo_url')
+            'fields': ('title', 'description', 'logo_url', 'concierge_logo_url', 'thank_you_message')
         }),
         ('Settings', {
             'fields': ('is_active', 'store_basic_details'),
