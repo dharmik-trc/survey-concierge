@@ -79,6 +79,8 @@ class Question(models.Model):
     
     # Grid-specific controls
     exclusive_column = models.CharField(max_length=999, blank=True, null=True, help_text='Column name that should be exclusive (only one option can be selected per row)')
+    randomize_rows = models.BooleanField(default=False, help_text='Randomize the order of rows in grid questions')
+    randomize_columns = models.BooleanField(default=False, help_text='Randomize the order of columns in grid questions')
     
     # Comment box (separate from Other option)
     has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')

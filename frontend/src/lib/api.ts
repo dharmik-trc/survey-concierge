@@ -17,6 +17,8 @@ export interface Question {
   none_option_text?: string | null;
   has_other_option: boolean;
   exclusive_column?: string | null;
+  randomize_rows: boolean;
+  randomize_columns: boolean;
   has_comment_box: boolean;
   comment_box_rows: number;
   comment_box_label?: string | null;
@@ -227,19 +229,39 @@ export const OTHER_OPTION = "Other, please specify";
 export const DEFAULT_NONE_OPTION = "None of the above";
 
 // Simplified utility functions for option handling
+// Simple shuffle function for consistent randomization (same as in survey page)
+const shuffleWithSeed = <T>(array: T[], seed: string): T[] => {
+  return [...array].sort((a, b) => {
+    const getHash = (item: T) => {
+      const str = seed + String(item);
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash += str.charCodeAt(i);
+      }
+      return hash;
+    };
+    return getHash(a) - getHash(b);
+  });
+};
+
 export const optionUtils = {
   /**
    * Get options with proper hierarchy: regular options (randomized if needed) + Other + None of the Above
    */
   getOptionsWithSpecialHandling: (
-    question: Question
+    question: Question,
+    surveyId?: string
   ): { options: string[]; hasOtherOption: boolean; hasNoneOption: boolean } => {
     const baseOptions = question.options || [];
 
     // If randomization is enabled, randomize only the base options
     let processedOptions = [...baseOptions];
     if (question.randomize_options && baseOptions.length > 0) {
-      processedOptions = [...baseOptions].sort(() => Math.random() - 0.5);
+      // Use seeded randomization for consistent results per user
+      const seed = surveyId
+        ? `${surveyId}-${question.id}-options`
+        : `${question.id}-options`;
+      processedOptions = shuffleWithSeed(baseOptions, seed);
     }
 
     // Build final options array with proper hierarchy
@@ -268,7 +290,8 @@ export const optionUtils = {
    */
   getRandomizedOptions: (
     options: string[],
-    shouldRandomize: boolean = false
+    shouldRandomize: boolean = false,
+    seed: string = "default-seed"
   ): string[] => {
     if (!options || options.length === 0) return options;
 
@@ -277,8 +300,8 @@ export const optionUtils = {
       return [...options];
     }
 
-    // Randomize regular options only
-    return [...options].sort(() => Math.random() - 0.5);
+    // Use seeded randomization for consistency
+    return shuffleWithSeed(options, seed);
   },
 
   /**

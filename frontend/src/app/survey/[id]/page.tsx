@@ -30,6 +30,25 @@ interface ValidationErrors {
   [questionId: string | number]: string;
 }
 
+// Simple shuffle function that gives consistent results based on a seed
+const shuffleArrayWithSeed = <T,>(array: T[], seed: string): T[] => {
+  // Sort the array based on a hash of each item + seed
+  // This is simple and gives the same order for the same seed every time
+  return [...array].sort((a, b) => {
+    // Create a simple number from the seed + item
+    const getHash = (item: T) => {
+      const str = seed + String(item);
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash += str.charCodeAt(i);
+      }
+      return hash;
+    };
+
+    return getHash(a) - getHash(b);
+  });
+};
+
 // Helper function to parse markdown-like formatting in question text (supports nesting)
 const parseQuestionText = (text: string, keyPrefix = ""): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
@@ -177,7 +196,10 @@ export default function SurveyPage({
       return randomizedOptions[question.id];
     }
 
-    const { options } = optionUtils.getOptionsWithSpecialHandling(question);
+    const { options } = optionUtils.getOptionsWithSpecialHandling(
+      question,
+      surveyId
+    );
     setRandomizedOptions((prev) => ({
       ...prev,
       [question.id]: options,
@@ -1203,7 +1225,7 @@ export default function SurveyPage({
         // Get processed options with special handling
         const randomizedOptions = getRandomizedOptions(question);
         const { hasOtherOption, hasNoneOption } =
-          optionUtils.getOptionsWithSpecialHandling(question);
+          optionUtils.getOptionsWithSpecialHandling(question, surveyId);
 
         const otherOption = OTHER_OPTION;
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
@@ -1453,7 +1475,7 @@ export default function SurveyPage({
         // Get processed options with special handling
         const randomizedOptions = getRandomizedOptions(question);
         const { hasOtherOption, hasNoneOption } =
-          optionUtils.getOptionsWithSpecialHandling(question);
+          optionUtils.getOptionsWithSpecialHandling(question, surveyId);
 
         const otherOption = OTHER_OPTION;
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
@@ -2052,13 +2074,28 @@ export default function SurveyPage({
           rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
             ? (rawValue as { [row: string]: string })
             : {};
+
+        // Apply randomization if enabled
+        const displayRows = question.randomize_rows
+          ? shuffleArrayWithSeed(
+              question.rows,
+              `${surveyId}-${question.id}-rows`
+            )
+          : question.rows;
+        const displayColumns = question.randomize_columns
+          ? shuffleArrayWithSeed(
+              question.columns,
+              `${surveyId}-${question.id}-columns`
+            )
+          : question.columns;
+
         return (
           <div className="overflow-x-auto">
             <table className="min-w-full border border-gray-200 rounded-lg">
               <thead>
                 <tr>
                   <th className="px-4 py-2"></th>
-                  {question.columns?.map((col) => (
+                  {displayColumns?.map((col) => (
                     <th
                       key={col}
                       className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
@@ -2070,12 +2107,12 @@ export default function SurveyPage({
                 </tr>
               </thead>
               <tbody>
-                {question.rows.map((row) => (
+                {displayRows.map((row) => (
                   <tr key={row}>
                     <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
                       {row}
                     </td>
-                    {question.columns?.map((col) => (
+                    {displayColumns?.map((col) => (
                       <td
                         key={col}
                         className="px-2 sm:px-4 py-2 text-center"
@@ -2119,7 +2156,117 @@ export default function SurveyPage({
       }
 
       case "cross_matrix_checkbox":
-      case "grid_multi":
+      case "grid_multi": {
+        if (!question.rows || !question.columns) return null;
+        const rawValue = responses[question.id];
+        const matrixMultiValue: { [row: string]: string[] } =
+          rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
+            ? (rawValue as { [row: string]: string[] })
+            : {};
+
+        // Apply randomization if enabled
+        const displayRows = question.randomize_rows
+          ? shuffleArrayWithSeed(
+              question.rows,
+              `${surveyId}-${question.id}-rows`
+            )
+          : question.rows;
+        const displayColumns = question.randomize_columns
+          ? shuffleArrayWithSeed(
+              question.columns,
+              `${surveyId}-${question.id}-columns`
+            )
+          : question.columns;
+
+        return (
+          <div className="overflow-x-auto">
+            <table className="min-w-full border border-gray-200 rounded-lg">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2"></th>
+                  {displayColumns?.map((col) => (
+                    <th
+                      key={col}
+                      className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
+                      style={{ minWidth: 120, maxWidth: 140, width: 130 }}
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {displayRows.map((row) => (
+                  <tr key={row}>
+                    <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
+                      {row}
+                    </td>
+                    {displayColumns?.map((col) => {
+                      const isChecked =
+                        Array.isArray(matrixMultiValue[row]) &&
+                        matrixMultiValue[row].includes(col);
+                      return (
+                        <td
+                          key={col}
+                          className="px-2 sm:px-4 py-2 text-center"
+                          style={{ minWidth: 120, maxWidth: 140, width: 130 }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const currentValues = Array.isArray(
+                                matrixMultiValue[row]
+                              )
+                                ? matrixMultiValue[row]
+                                : [];
+                              let newValues: string[];
+
+                              if (e.target.checked) {
+                                // Add the column if checked
+                                newValues = [...currentValues, col];
+                              } else {
+                                // Remove the column if unchecked
+                                newValues = currentValues.filter(
+                                  (v) => v !== col
+                                );
+                              }
+
+                              const next = {
+                                ...matrixMultiValue,
+                                [row]: newValues,
+                              };
+                              handleResponseChange(question.id, next);
+                            }}
+                            className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {error && (
+              <p className="text-red-500 text-sm mt-2 flex items-center">
+                <svg
+                  className="w-4 h-4 mr-1"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {error}
+              </p>
+            )}
+          </div>
+        );
+      }
+
       default:
         return <p className="text-gray-500">Unsupported question type</p>;
     }

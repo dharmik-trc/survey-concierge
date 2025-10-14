@@ -385,8 +385,8 @@ class SurveyAdmin(admin.ModelAdmin):
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     form = QuestionAdminForm
-    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'exclusive_column', 'store_on_next', 'order']
-    list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'store_on_next', 'survey']
+    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'exclusive_column', 'randomize_rows', 'randomize_columns', 'store_on_next', 'order']
+    list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'randomize_rows', 'randomize_columns', 'store_on_next', 'survey']
     search_fields = ['question_text', 'survey__title']
     ordering = ['survey', 'order']
     
@@ -411,7 +411,8 @@ class QuestionAdmin(admin.ModelAdmin):
              'fields': ('has_other_option',),
          }),
         ('Grid Settings', {
-            'fields': ('rows', 'columns'),
+            'fields': ('rows', 'columns', 'randomize_rows', 'randomize_columns'),
+            'description': 'For Grid questions. Define rows and columns, then optionally randomize their order to reduce bias.'
         }),
         ('Form Fields', {
             'fields': ('subfields', 'subfield_validations'),
