@@ -165,7 +165,18 @@ def write_answer_to_cell(ws, row_num, col_idx, value, alignment):
     if isinstance(value, list):
         value_str = ', '.join([str(item) for item in value])
     elif isinstance(value, dict):
-        value_str = json.dumps(value, ensure_ascii=False)
+        # Check if this is a combined answer + comment object
+        if 'answer' in value and 'comment' in value:
+            answer_part = value['answer']
+            comment_part = value['comment']
+            # Format as "Answer - Comment" for better readability
+            if comment_part and str(comment_part).strip():
+                value_str = f"{answer_part} - {comment_part}"
+            else:
+                value_str = str(answer_part)
+        else:
+            # For other dict types, use JSON format
+            value_str = json.dumps(value, ensure_ascii=False)
     else:
         value_str = str(value)
     

@@ -564,15 +564,28 @@ export default function SurveyPage({
       currentValue !== undefined
     ) {
       try {
+        // Combine main answer with comment if it exists
+        let answerToSave: any = currentValue;
+        const commentKey = `${currentQuestion.id}_comment`;
+        const commentValue = responses[commentKey];
+
+        if (commentValue && String(commentValue).trim()) {
+          // Store as an object with both answer and comment
+          answerToSave = {
+            answer: currentValue,
+            comment: commentValue,
+          };
+        }
+
         await apiService.savePartialResponse(
           survey.id,
           currentQuestion.id,
-          currentValue,
+          answerToSave,
           sessionId
         );
         console.log(
           `Partial response saved for question ${currentQuestion.id}:`,
-          currentValue
+          answerToSave
         );
       } catch (error) {
         console.error("Failed to save partial response:", error);
@@ -2143,15 +2156,29 @@ export default function SurveyPage({
               console.log("question", question);
               console.log("responses[question.id]", responses[question.id]);
               console.log("sessionId", sessionId);
+
+              // Combine main answer with comment if it exists
+              let answerToSave: any = responses[question.id];
+              const commentKey = `${question.id}_comment`;
+              const commentValue = responses[commentKey];
+
+              if (commentValue && String(commentValue).trim()) {
+                // Store as an object with both answer and comment
+                answerToSave = {
+                  answer: responses[question.id],
+                  comment: commentValue,
+                };
+              }
+
               await apiService.savePartialResponse(
                 survey.id,
                 question.id,
-                responses[question.id],
+                answerToSave,
                 sessionId
               );
               console.log(
                 `Partial response saved for question ${question.id}:`,
-                responses[question.id]
+                answerToSave
               );
             } catch (error) {
               console.error("Failed to save partial response:", error);
