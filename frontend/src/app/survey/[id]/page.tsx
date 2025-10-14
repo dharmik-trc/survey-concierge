@@ -251,6 +251,24 @@ export default function SurveyPage({
         } else {
           console.log("No saved progress found - starting fresh survey");
           setIsRestoringProgress(false);
+
+          // Initialize slider questions to their median value to avoid bias
+          const initialSliderValues: SurveyResponse = {};
+          data.questions.forEach((q) => {
+            if (q.secondary_type === "slider" || q.question_type === "slider") {
+              const min = q.scale_min ?? 0;
+              const max = q.scale_max ?? 10;
+              const median = Math.round((min + max) / 2);
+              initialSliderValues[q.id] = median;
+            }
+          });
+          if (Object.keys(initialSliderValues).length > 0) {
+            setResponses(initialSliderValues);
+            console.log(
+              "Initialized slider values to median:",
+              initialSliderValues
+            );
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch survey");
@@ -1049,7 +1067,9 @@ export default function SurveyPage({
         const scaleStep = question.scale_step ?? 1;
         const scaleMinLabel = question.scale_min_label || "";
         const scaleMaxLabel = question.scale_max_label || "";
-        const currentValue = typeof value === "number" ? value : scaleMin;
+        // Default to median (middle) of the range to avoid bias
+        const median = Math.round((scaleMin + scaleMax) / 2);
+        const currentValue = typeof value === "number" ? value : median;
 
         return (
           <div className="space-y-4">
