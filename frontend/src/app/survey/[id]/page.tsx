@@ -210,7 +210,6 @@ export default function SurveyPage({
   // Function to show save notification
   const displaySaveNotification = () => {
     setShowSaveNotification(true);
-    setTimeout(() => setShowSaveNotification(false), 2000);
   };
 
   // Function to clear saved progress and start over
@@ -1041,6 +1040,7 @@ export default function SurveyPage({
               onBlur={(e) =>
                 handleBlur(question.id, e.target.value, questionType)
               }
+              onWheel={(e) => e.currentTarget.blur()}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
@@ -2059,6 +2059,7 @@ export default function SurveyPage({
                                   "text"
                               );
                             }}
+                            onWheel={(e) => e.currentTarget.blur()}
                           />
                         </td>
                       </tr>
