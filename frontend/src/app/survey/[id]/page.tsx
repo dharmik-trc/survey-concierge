@@ -243,10 +243,50 @@ export default function SurveyPage({
         const savedProgress = cookieUtils.getSurveyProgress(surveyId);
         if (savedProgress) {
           console.log("Restoring survey progress from cookies:", savedProgress);
-          setResponses(savedProgress.responses);
-          setCurrentSectionIndex(savedProgress.currentSectionIndex);
-          setOtherTexts(savedProgress.otherTexts);
-          setIsRestoringProgress(true);
+
+          // Validate that the saved section index is within bounds
+          const sections = getSections(data.questions);
+          const savedIndex = savedProgress.currentSectionIndex;
+          const maxValidIndex = sections.length - 1;
+
+          // If saved index is out of bounds, clear cookie and start fresh
+          if (savedIndex < 0 || savedIndex > maxValidIndex) {
+            console.warn(
+              `Saved section index ${savedIndex} is out of bounds (max: ${maxValidIndex}). Clearing cookie and starting fresh.`
+            );
+            cookieUtils.clearSurveyProgress(surveyId);
+            setCurrentSectionIndex(0);
+            setResponses({});
+            setOtherTexts({});
+            setIsRestoringProgress(false);
+
+            // Initialize slider questions to their median value
+            const initialSliderValues: SurveyResponse = {};
+            data.questions.forEach((q) => {
+              if (
+                q.secondary_type === "slider" ||
+                q.question_type === "slider"
+              ) {
+                const min = q.scale_min ?? 0;
+                const max = q.scale_max ?? 10;
+                const median = Math.round((min + max) / 2);
+                initialSliderValues[q.id] = median;
+              }
+            });
+            if (Object.keys(initialSliderValues).length > 0) {
+              setResponses(initialSliderValues);
+              console.log(
+                "Initialized slider values to median:",
+                initialSliderValues
+              );
+            }
+          } else {
+            // Valid index, restore progress normally
+            setResponses(savedProgress.responses);
+            setCurrentSectionIndex(savedIndex);
+            setOtherTexts(savedProgress.otherTexts);
+            setIsRestoringProgress(true);
+          }
         } else {
           console.log("No saved progress found - starting fresh survey");
           setIsRestoringProgress(false);
@@ -2384,7 +2424,7 @@ export default function SurveyPage({
       );
       console.log("survey?.store_basic_details", survey?.store_basic_details);
       // Save partial responses for questions in current section that have store_on_next enabled
-      if (survey?.store_basic_details) {
+      if (survey?.store_basic_details && sections[currentSectionIndex]) {
         console.log("survey.store_basic_details", survey.store_basic_details);
         const currentSection = sections[currentSectionIndex];
         for (const question of currentSection.questions) {
@@ -2457,6 +2497,7 @@ export default function SurveyPage({
     const errors: ValidationErrors = {};
     let hasErrors = false;
     const currentSection = sections[currentSectionIndex];
+    if (!currentSection) return;
     currentSection.questions.forEach((question) => {
       const value = responses[question.id];
       const error = validateQuestion(
@@ -2664,7 +2705,7 @@ export default function SurveyPage({
             </div>
 
             {/* Sectioned Questions */}
-            {sections.length > 0 && (
+            {sections.length > 0 && sections[currentSectionIndex] && (
               <form onSubmit={handleSectionSubmit}>
                 <div className="mb-8">
                   {sections[currentSectionIndex].title.toLowerCase() !==
