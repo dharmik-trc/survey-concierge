@@ -37,14 +37,12 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
     col_num = 2  # Start at column 2 (column 1 is for session number)
     question_num = 0
     
-    # Number column header (spans both rows)
-    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    # Number column header (single row)
     cell = ws.cell(row=1, column=1)
     cell.value = "#"
     cell.fill = styles['header_fill']
     cell.font = styles['header_font']
     cell.alignment = styles['header_alignment']
-    ws.cell(row=2, column=1).fill = styles['header_fill']
     
     # Question columns
     for question in all_questions:
@@ -58,17 +56,13 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
             end_col = col_num + len(options) - 1
             question_column_map[question.id] = {'_type': 'multi_select', '_options': {}}
             
-            # Row 1: Merged main question header
-            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
-            main_cell = ws.cell(row=1, column=start_col)
-            main_cell.value = f"Q{question_num}: {question_text}"
-            main_cell.fill = styles['header_fill']
-            main_cell.font = styles['header_font']
-            main_cell.alignment = styles['header_alignment']
-            
-            # Style all merged cells
+            # Row 1: Full question repeated in each column
             for col in range(start_col, end_col + 1):
-                ws.cell(row=1, column=col).fill = styles['header_fill']
+                main_cell = ws.cell(row=1, column=col)
+                main_cell.value = f"Q{question_num}: {question_text}"
+                main_cell.fill = styles['header_fill']
+                main_cell.font = styles['header_font']
+                main_cell.alignment = styles['header_alignment']
             
             # Row 2: Option columns with Q#_# format
             for idx, option in enumerate(options, 1):
@@ -87,37 +81,31 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
             end_col = col_num + len(subfields) - 1
             question_column_map[question.id] = {}
             
-            # Row 1: Merged main question header
-            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
-            main_cell = ws.cell(row=1, column=start_col)
-            main_cell.value = f"Q{question_num}: {question_text}"
-            main_cell.fill = styles['header_fill']
-            main_cell.font = styles['header_font']
-            main_cell.alignment = styles['header_alignment']
-            
-            # Style all merged cells
+            # Row 1: Full question repeated in each column
             for col in range(start_col, end_col + 1):
-                ws.cell(row=1, column=col).fill = styles['header_fill']
+                main_cell = ws.cell(row=1, column=col)
+                main_cell.value = f"Q{question_num}: {question_text}"
+                main_cell.fill = styles['header_fill']
+                main_cell.font = styles['header_font']
+                main_cell.alignment = styles['header_alignment']
             
-            # Row 2: Sub-column headers
-            for subfield in subfields:
+            # Row 2: Sub-column headers with Q4_1 Answer format
+            for idx, subfield in enumerate(subfields, 1):
                 subfield_display = subfield.replace('_', ' ').title()
                 cell = ws.cell(row=2, column=col_num)
-                cell.value = subfield_display
+                cell.value = f"Q{question_num}_{idx} {subfield_display}"
                 cell.fill = styles['subheader_fill']
                 cell.font = styles['subheader_font']
                 cell.alignment = styles['header_alignment']
                 question_column_map[question.id][subfield] = col_num
                 col_num += 1
         else:
-            # Simple question - single column spanning both rows
-            ws.merge_cells(start_row=1, start_column=col_num, end_row=2, end_column=col_num)
+            # Simple question - single column with single row header
             cell = ws.cell(row=1, column=col_num)
             cell.value = f"Q{question_num}: {question_text}"
             cell.fill = styles['header_fill']
             cell.font = styles['header_font']
             cell.alignment = styles['header_alignment']
-            ws.cell(row=2, column=col_num).fill = styles['header_fill']
             question_column_map[question.id] = {'_main': col_num}
             col_num += 1
     
@@ -125,23 +113,19 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
     is_completed_col = col_num
     last_activity_col = col_num + 1
     
-    # Is Completed column
-    ws.merge_cells(start_row=1, start_column=is_completed_col, end_row=2, end_column=is_completed_col)
+    # Is Completed column (single row)
     cell = ws.cell(row=1, column=is_completed_col)
     cell.value = "Is Completed"
     cell.fill = styles['header_fill']
     cell.font = styles['header_font']
     cell.alignment = styles['header_alignment']
-    ws.cell(row=2, column=is_completed_col).fill = styles['header_fill']
     
-    # Last Activity column
-    ws.merge_cells(start_row=1, start_column=last_activity_col, end_row=2, end_column=last_activity_col)
+    # Last Activity column (single row)
     cell = ws.cell(row=1, column=last_activity_col)
     cell.value = "Last Activity"
     cell.fill = styles['header_fill']
     cell.font = styles['header_font']
     cell.alignment = styles['header_alignment']
-    ws.cell(row=2, column=last_activity_col).fill = styles['header_fill']
     
     return question_column_map, is_completed_col, last_activity_col
 
@@ -308,7 +292,7 @@ def write_complex_answer(ws, row_num, answer, col_map, alignment):
             write_answer_to_cell(ws, row_num, col_idx, value if value else '', alignment)
 
 
-def write_data_rows(ws, sessions, all_questions, question_column_map, is_completed_col, last_activity_col, styles):
+def write_data_rows(ws, sessions, all_questions, question_column_map, is_completed_col, last_activity_col, styles, question_subfields, multi_select_questions):
     """
     Write all data rows to the worksheet.
     
@@ -320,8 +304,13 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
         is_completed_col: Column index for "Is Completed"
         last_activity_col: Column index for "Last Activity"
         styles: Dict of style objects
+        question_subfields: Dict mapping question IDs to subfield names
+        multi_select_questions: Dict mapping question IDs to list of options
     """
-    row_num = 3  # Start at row 3 (after two-row header)
+    # Determine starting row based on whether we have multi-select questions or subfields
+    has_multi_select = any(question.id in multi_select_questions for question in all_questions)
+    has_subfields = any(question.id in question_subfields for question in all_questions)
+    row_num = 3 if (has_multi_select or has_subfields) else 2  # Start after headers
     session_num = 0
     alignment = Alignment(wrap_text=True, vertical="top")
     
@@ -368,13 +357,16 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
         row_num += 1
 
 
-def format_worksheet(ws, last_activity_col):
+def format_worksheet(ws, last_activity_col, all_questions, question_subfields, multi_select_questions):
     """
     Apply formatting to the worksheet (column widths, row heights, freeze panes).
     
     Args:
         ws: Worksheet object
         last_activity_col: Index of the last column with data
+        all_questions: List of Question objects
+        question_subfields: Dict mapping question IDs to subfield names
+        multi_select_questions: Dict mapping question IDs to list of options
     """
     # Column widths
     ws.column_dimensions['A'].width = 8  # Number column (narrow)
@@ -383,11 +375,18 @@ def format_worksheet(ws, last_activity_col):
         ws.column_dimensions[col_letter].width = 25
     
     # Row heights for headers
-    ws.row_dimensions[1].height = 30  # Main header row
-    ws.row_dimensions[2].height = 25  # Sub-header row
+    has_subfields = any(question.id in question_subfields for question in all_questions)
+    has_multi_select = any(question.id in multi_select_questions for question in all_questions)
     
-    # Freeze first two rows (headers) and first column (session numbers)
-    ws.freeze_panes = 'A3'
+    ws.row_dimensions[1].height = 30  # Main header row
+    if has_subfields or has_multi_select:
+        ws.row_dimensions[2].height = 25  # Sub-column headers or options
+        freeze_row = 'A3'  # Freeze first 2 rows
+    else:
+        freeze_row = 'A2'  # Freeze first row only
+    
+    # Freeze panes based on header structure
+    ws.freeze_panes = freeze_row
 
 
 def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question_subfields, multi_select_questions, styles):
@@ -417,10 +416,10 @@ def create_worksheet_with_data(wb, sheet_name, sessions, all_questions, question
     
     # Write data rows
     write_data_rows(ws, sessions, all_questions, question_column_map, 
-                    is_completed_col, last_activity_col, styles)
+                    is_completed_col, last_activity_col, styles, question_subfields, multi_select_questions)
     
     # Format worksheet
-    format_worksheet(ws, last_activity_col)
+    format_worksheet(ws, last_activity_col, all_questions, question_subfields, multi_select_questions)
     
     return ws
 
