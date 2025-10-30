@@ -89,23 +89,32 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
                 main_cell.font = styles['header_font']
                 main_cell.alignment = styles['header_alignment']
             
-            # Row 2: Sub-column headers with Q4_1 Answer format
+            # Row 2: Sub-column headers with "id: text" format
             for idx, subfield in enumerate(subfields, 1):
                 subfield_display = subfield.replace('_', ' ').title()
                 cell = ws.cell(row=2, column=col_num)
-                cell.value = f"Q{question_num}_{idx} {subfield_display}"
+                cell.value = f"Q{question_num}_{idx}: {subfield_display}"
                 cell.fill = styles['subheader_fill']
                 cell.font = styles['subheader_font']
                 cell.alignment = styles['header_alignment']
                 question_column_map[question.id][subfield] = col_num
                 col_num += 1
         else:
-            # Simple question - single column with single row header
+            # Simple question - single column with two-row header
+            # Row 1: Main question text
             cell = ws.cell(row=1, column=col_num)
             cell.value = f"Q{question_num}: {question_text}"
             cell.fill = styles['header_fill']
             cell.font = styles['header_font']
             cell.alignment = styles['header_alignment']
+
+            # Row 2: Repeat question text for consistency with other question types
+            sub_cell = ws.cell(row=2, column=col_num)
+            sub_cell.value = f"Q{question_num}: {question_text}"
+            sub_cell.fill = styles['subheader_fill']
+            sub_cell.font = styles['subheader_font']
+            sub_cell.alignment = styles['header_alignment']
+
             question_column_map[question.id] = {'_main': col_num}
             col_num += 1
     
@@ -308,9 +317,8 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
         multi_select_questions: Dict mapping question IDs to list of options
     """
     # Determine starting row based on whether we have multi-select questions or subfields
-    has_multi_select = any(question.id in multi_select_questions for question in all_questions)
-    has_subfields = any(question.id in question_subfields for question in all_questions)
-    row_num = 3 if (has_multi_select or has_subfields) else 2  # Start after headers
+    # Start after two header rows for consistency across all question types
+    row_num = 3
     session_num = 0
     alignment = Alignment(wrap_text=True, vertical="top")
     
@@ -375,15 +383,10 @@ def format_worksheet(ws, last_activity_col, all_questions, question_subfields, m
         ws.column_dimensions[col_letter].width = 25
     
     # Row heights for headers
-    has_subfields = any(question.id in question_subfields for question in all_questions)
-    has_multi_select = any(question.id in multi_select_questions for question in all_questions)
-    
+    # Always set two header rows (row 1 and 2) and freeze below them
     ws.row_dimensions[1].height = 30  # Main header row
-    if has_subfields or has_multi_select:
-        ws.row_dimensions[2].height = 25  # Sub-column headers or options
-        freeze_row = 'A3'  # Freeze first 2 rows
-    else:
-        freeze_row = 'A2'  # Freeze first row only
+    ws.row_dimensions[2].height = 25  # Second header row
+    freeze_row = 'A3'  # Freeze first 2 rows consistently
     
     # Freeze panes based on header structure
     ws.freeze_panes = freeze_row
