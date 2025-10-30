@@ -191,16 +191,6 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Available Surveys
-          </h2>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Discover and participate in our collection of surveys. Each survey
-            is designed to gather valuable insights and feedback.
-          </p>
-        </div>
-
         <main>
           {surveys.length === 0 ? (
             <div className="text-center py-16">
@@ -243,9 +233,24 @@ export default function Dashboard() {
                       </span>
                     </div>
 
-                    <p className="text-gray-600 text-sm mb-6 line-clamp-3 leading-relaxed">
-                      {survey.description || "No description available"}
-                    </p>
+                    {/* Counts row (partial, completed, all) */}
+                    <div className="flex flex-wrap items-center gap-2 mb-6">
+                      {typeof survey.partial_responses === "number" && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-800 border border-yellow-200">
+                          Partial: {survey.partial_responses}
+                        </span>
+                      )}
+                      {typeof survey.completed_responses === "number" && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          Completed: {survey.completed_responses}
+                        </span>
+                      )}
+                      {typeof survey.all_responses === "number" && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200">
+                          All: {survey.all_responses}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex items-center justify-between text-xs text-gray-500 mb-6">
                       <span className="flex items-center">
@@ -355,7 +360,7 @@ export default function Dashboard() {
         <footer className="mt-16 text-center">
           <div className="border-t border-gray-200 pt-8">
             <p className="text-gray-500 text-sm">
-              © 2024 Survey Concierge. Professional survey platform for data
+              © 2025 Survey Concierge. Professional survey platform for data
               collection and insights.
             </p>
           </div>

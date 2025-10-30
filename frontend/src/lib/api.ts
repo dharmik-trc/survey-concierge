@@ -71,6 +71,10 @@ export interface SurveyListItem {
   created_at: string;
   question_count: number;
   is_active: boolean;
+  // Added counts from backend
+  partial_responses?: number;
+  completed_responses?: number;
+  all_responses?: number;
 }
 
 export interface SurveyResponse {

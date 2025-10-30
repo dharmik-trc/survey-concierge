@@ -29,13 +29,37 @@ class SurveySerializer(serializers.ModelSerializer):
 
 class SurveyListSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()
+    partial_responses = serializers.SerializerMethodField()
+    completed_responses = serializers.SerializerMethodField()
+    all_responses = serializers.SerializerMethodField()
     
     class Meta:
         model = Survey
-        fields = ['id', 'title', 'description', 'created_at', 'question_count', 'is_active']
+        fields = ['id', 'title', 'description', 'created_at', 'question_count', 'is_active', 'partial_responses', 'completed_responses', 'all_responses']
     
     def get_question_count(self, obj):
         return obj.questions.count()
+
+    def get_partial_responses(self, obj):
+        # Count only partial responses that have not been completed yet
+        from .models import PartialSurveyResponse
+        # De-duplicate by session so multiple question rows for the same session
+        # don't inflate the count
+        return (
+            PartialSurveyResponse.objects
+            .filter(survey=obj, is_completed=False)
+            .values('session_id', 'ip_address')
+            .distinct()
+            .count()
+        )
+
+    def get_completed_responses(self, obj):
+        from .models import SurveyResponse
+        return SurveyResponse.objects.filter(survey=obj).count()
+
+    def get_all_responses(self, obj):
+        # Sum of completed + current partial responses
+        return self.get_completed_responses(obj) + self.get_partial_responses(obj)
 
 class QuestionResponseSerializer(serializers.ModelSerializer):
     class Meta:
