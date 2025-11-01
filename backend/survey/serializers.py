@@ -3,6 +3,7 @@ from django.core.validators import EmailValidator
 from django.core.exceptions import ValidationError
 import re
 from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse
+from .count_utils import count_partial_responses, count_completed_responses, count_all_responses
 
 # Character limits for different field types
 MAX_TEXT_LENGTH = 99999
@@ -41,25 +42,16 @@ class SurveyListSerializer(serializers.ModelSerializer):
         return obj.questions.count()
 
     def get_partial_responses(self, obj):
-        # Count only partial responses that have not been completed yet
-        from .models import PartialSurveyResponse
-        # De-duplicate by session so multiple question rows for the same session
-        # don't inflate the count
-        return (
-            PartialSurveyResponse.objects
-            .filter(survey=obj, is_completed=False)
-            .values('session_id', 'ip_address')
-            .distinct()
-            .count()
-        )
+        """Use centralized counting logic."""
+        return count_partial_responses(obj)
 
     def get_completed_responses(self, obj):
-        from .models import SurveyResponse
-        return SurveyResponse.objects.filter(survey=obj).count()
+        """Use centralized counting logic."""
+        return count_completed_responses(obj)
 
     def get_all_responses(self, obj):
-        # Sum of completed + current partial responses
-        return self.get_completed_responses(obj) + self.get_partial_responses(obj)
+        """Use centralized counting logic."""
+        return count_all_responses(obj)
 
 class QuestionResponseSerializer(serializers.ModelSerializer):
     class Meta:

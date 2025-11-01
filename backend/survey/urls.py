@@ -9,7 +9,7 @@ from .views import (
     save_partial_response,
     health_check
 )
-from .exports import export_survey_responses
+from .exports import export_survey_responses, export_analytics
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),
@@ -21,4 +21,5 @@ urlpatterns = [
     path('surveys/<uuid:survey_id>/submit/', submit_survey_response, name='submit_survey_response'),
     path('surveys/<uuid:survey_id>/questions/<int:question_id>/save-partial/', save_partial_response, name='save_partial_response'),
     path('surveys/<uuid:survey_id>/responses/export/', export_survey_responses, name='export_survey_responses'),
+    path('surveys/<uuid:survey_id>/analytics/export/', export_analytics, name='export_analytics'),
 ] 

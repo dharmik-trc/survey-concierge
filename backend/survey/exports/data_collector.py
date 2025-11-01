@@ -2,29 +2,37 @@
 Data Collection Utilities
 
 This module handles collecting and organizing survey response data for export.
+Uses centralized counting logic to ensure consistency with serializer counts.
 """
 
 from ..models import PartialSurveyResponse, SurveyResponse, QuestionResponse
+from ..count_utils import count_partial_responses, count_completed_responses
 
 
 def collect_session_data(survey):
     """
-    Collect and organize partial response data by session.
+    Collect and organize partial response data by session_id.
+    
+    Uses the same filtering logic as count_partial_responses to ensure consistency:
+    - Only includes partial responses with is_completed=False
+    - Groups by session_id
     
     Args:
         survey: Survey instance
     
     Returns:
-        tuple: (sessions dict, completed_sessions_info dict)
+        tuple: (sessions dict, completed_session_ids set)
             - sessions: Dict mapping session_id to session data with questions, timestamps, completion status
-            - completed_sessions_info: Dict mapping session_id to IP and timestamp for completed sessions
+            - completed_session_ids: Set of session_ids that are marked as completed
     """
+    # Use same filter as count_partial_responses for consistency
     partial_responses = PartialSurveyResponse.objects.filter(
-        survey=survey
-    ).select_related('question').order_by('session_id', 'created_at')
+        survey=survey,
+        is_completed=False  # Only get incomplete partial responses
+    ).select_related('question').order_by('session_id')
     
     sessions = {}
-    completed_sessions_info = {}
+    completed_session_ids = set()
     
     for response in partial_responses:
         session_id = response.session_id or 'unknown'
@@ -33,7 +41,7 @@ def collect_session_data(survey):
         if session_id not in sessions:
             sessions[session_id] = {
                 'ip_address': response.ip_address or 'unknown',
-                'is_completed': response.is_completed,
+                'is_completed': False,  # All are incomplete by filter
                 'last_activity': response.updated_at,
                 'first_activity': response.created_at,
                 'questions': {}
@@ -42,56 +50,68 @@ def collect_session_data(survey):
         # Store question response
         sessions[session_id]['questions'][response.question.id] = response.answer
         
-        # Track completed sessions
-        if response.is_completed:
-            sessions[session_id]['is_completed'] = True
-            if session_id not in completed_sessions_info:
-                completed_sessions_info[session_id] = {
-                    'ip': response.ip_address,
-                    'updated_at': response.updated_at
-                }
-        
         # Update timestamps
         if response.created_at < sessions[session_id]['first_activity']:
             sessions[session_id]['first_activity'] = response.created_at
         if response.updated_at > sessions[session_id]['last_activity']:
             sessions[session_id]['last_activity'] = response.updated_at
     
-    return sessions, completed_sessions_info
+    # Note: completed_session_ids will be empty since we only fetched incomplete ones
+    # Completed responses come from SurveyResponse table via merge_completed_responses
+    return sessions, completed_session_ids
 
 
-def merge_completed_responses(survey, sessions, completed_sessions_info):
+def merge_completed_responses(survey, sessions, completed_session_ids):
     """
-    Fetch and merge complete survey responses for completed sessions.
+    Fetch and add complete survey responses from SurveyResponse -> QuestionResponse.
     
-    This function looks up complete survey submissions and merges their answers
-    into the session data, ensuring we have all answers even if they weren't
-    stored in the partial response table.
+    Adds all completed responses from SurveyResponse table as separate sessions.
+    Uses the same logic as count_completed_responses to ensure consistency.
     
     Args:
         survey: Survey instance
-        sessions: Dict of session data (will be modified in place)
-        completed_sessions_info: Dict mapping session_id to IP/timestamp info
+        sessions: Dict of session data (will be modified in place - adds completed responses)
+        completed_session_ids: Set (unused, kept for compatibility)
     """
-    for session_id, info in completed_sessions_info.items():
-        # Find the most recent complete survey response by IP
-        survey_response = SurveyResponse.objects.filter(
-            survey=survey,
-            ip_address=info['ip']
-        ).prefetch_related('question_responses__question').order_by('-submitted_at').first()
+    # Step 1: Get all SurveyResponse IDs for this survey (same as count_completed_responses)
+    survey_response_ids = SurveyResponse.objects.filter(
+        survey=survey
+    ).values_list('id', flat=True)
+    
+    if not survey_response_ids:
+        return
+    
+    # Step 2: Get all QuestionResponse records for these survey responses
+    question_responses = QuestionResponse.objects.filter(
+        survey_response_id__in=survey_response_ids
+    ).select_related('question', 'survey_response')
+    
+    # Step 3: Group by survey_response and add to sessions
+    by_response = {}
+    for qr in question_responses:
+        response_id = qr.survey_response_id
+        if response_id not in by_response:
+            by_response[response_id] = {
+                'survey_response': qr.survey_response,
+                'question_responses': []
+            }
+        by_response[response_id]['question_responses'].append(qr)
+    
+    # Step 4: Add each completed response as a session (using response_id as session_id)
+    for response_id, data in by_response.items():
+        session_id = f"completed_{response_id}"  # Use prefix to avoid conflicts
         
-        if survey_response:
-            # Get all answers from the complete submission
-            question_responses = QuestionResponse.objects.filter(
-                survey_response=survey_response
-            ).select_related('question')
-            
-            # Merge complete answers into session data
-            for qr in question_responses:
-                sessions[session_id]['questions'][qr.question.id] = qr.answer
-            
-            # Update last activity timestamp
-            sessions[session_id]['last_activity'] = survey_response.submitted_at
+        sessions[session_id] = {
+            'ip_address': data['survey_response'].ip_address or 'unknown',
+            'is_completed': True,
+            'last_activity': data['survey_response'].submitted_at,
+            'first_activity': data['survey_response'].submitted_at,
+            'questions': {}
+        }
+        
+        # Add all question responses
+        for qr in data['question_responses']:
+            sessions[session_id]['questions'][qr.question.id] = qr.answer
 
 
 def get_subfields_for_answer(answer, question=None):
@@ -207,4 +227,68 @@ def filter_sessions_by_completion(sessions):
             partial_sessions[session_id] = session_data
     
     return partial_sessions, completed_sessions
+
+
+def collect_completed_responses_only(survey):
+    """
+    Collect ONLY fully completed survey responses from SurveyResponse table.
+    
+    IMPORTANT: This function explicitly excludes ANY partial response data.
+    It ONLY queries the SurveyResponse and QuestionResponse tables.
+    No PartialSurveyResponse data is included.
+    
+    Used for analytics which must only analyze fully completed responses.
+    
+    Process:
+    1. Get all SurveyResponse IDs for the survey (only fully submitted responses)
+    2. Get all QuestionResponse records for those responses
+    3. Aggregate by response_id -> question_id -> answer
+    
+    Args:
+        survey: Survey instance
+    
+    Returns:
+        dict: Sessions dict for analytics
+            - Format: {response_id: {'questions': {question_id: answer}}}
+            - Each response_id represents a fully completed SurveyResponse
+            - No partial/incomplete data included
+    """
+    # Step 1: Get all fully completed survey response IDs
+    # ONLY from SurveyResponse table - no partial responses
+    survey_response_ids = SurveyResponse.objects.filter(
+        survey=survey
+    ).values_list('id', flat=True)
+    
+    if not survey_response_ids:
+        return {}
+    
+    # Step 2: Get all question responses for these completed survey responses
+    # ONLY from QuestionResponse table - no partial data
+    question_responses = QuestionResponse.objects.filter(
+        survey_response_id__in=survey_response_ids
+    ).select_related('question', 'survey_response')
+    
+    # Step 3: Aggregate data by response
+    # Each response_id is a fully completed survey submission
+    # Also store metadata (response_id, submitted_at) for comment exports
+    sessions = {}
+    response_metadata = {}  # Map response_id to metadata
+    
+    for qr in question_responses:
+        response_id = str(qr.survey_response_id)
+        
+        if response_id not in sessions:
+            sessions[response_id] = {
+                'questions': {}
+            }
+            # Store metadata for this response
+            response_metadata[response_id] = {
+                'response_id': qr.survey_response.id,
+                'submitted_at': qr.survey_response.submitted_at
+            }
+        
+        # Store answer for this question
+        sessions[response_id]['questions'][qr.question.id] = qr.answer
+    
+    return sessions, response_metadata
 

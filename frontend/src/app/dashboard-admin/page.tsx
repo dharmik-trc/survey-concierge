@@ -13,6 +13,9 @@ export default function Dashboard() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [exportingResponses, setExportingResponses] = useState(false);
+  const [generatingAnalytics, setGeneratingAnalytics] = useState<string | null>(
+    null
+  );
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
@@ -88,6 +91,18 @@ export default function Dashboard() {
       alert("Failed to export survey responses");
     } finally {
       setExportingResponses(false);
+    }
+  };
+
+  const generateAnalytics = async (surveyId: string) => {
+    try {
+      setGeneratingAnalytics(surveyId);
+      await apiService.exportAnalytics(surveyId);
+    } catch (err) {
+      console.error("Failed to generate analytics:", err);
+      alert("Failed to generate analytics");
+    } finally {
+      setGeneratingAnalytics(null);
     }
   };
 
@@ -345,6 +360,36 @@ export default function Dashboard() {
                               />
                             </svg>
                             Export Responses
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => generateAnalytics(survey.id)}
+                        disabled={generatingAnalytics === survey.id}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 text-sm font-medium rounded-lg hover:from-purple-100 hover:to-pink-100 transition-colors duration-200 border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        title="Generate analytics and download Excel file with % and counts for each question"
+                      >
+                        {generatingAnalytics === survey.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-600 border-t-transparent"></div>
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                              />
+                            </svg>
+                            Generate Analytics
                           </>
                         )}
                       </button>
