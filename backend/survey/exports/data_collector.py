@@ -184,14 +184,36 @@ def analyze_question_subfields(sessions, questions):
             multi_select_questions[question.id] = options
     
     # Then analyze answers for other subfield types (forms, grids, etc.)
+    # First, check for grid questions and use their rows from the database
+    for question in questions:
+        primary_type = question.primary_type or ''
+        question_type = question.secondary_type or ''
+        # Check if this is a grid question (either by primary_type or secondary_type)
+        is_grid = (primary_type == 'grid' or 
+                  question_type in ['cross_matrix', 'grid_radio', 'cross_matrix_checkbox', 'grid_multi'])
+        if is_grid:
+            # For grid questions, use rows from the question definition to avoid duplicates
+            if question.rows and isinstance(question.rows, list):
+                question_subfields[question.id] = set(question.rows)
+    
+    # Then analyze answers for other question types (forms, etc.)
     for session_id, session_data in sessions.items():
         for question_id, answer in session_data['questions'].items():
             # Skip multi-select questions - they're handled separately
             if question_id in multi_select_questions:
                 continue
+            
+            # Skip grid questions - they're handled above using question.rows
+            question = question_map.get(question_id)
+            if question:
+                primary_type = question.primary_type or ''
+                question_type = question.secondary_type or ''
+                is_grid = (primary_type == 'grid' or 
+                          question_type in ['cross_matrix', 'grid_radio', 'cross_matrix_checkbox', 'grid_multi'])
+                if is_grid:
+                    continue
                 
             if answer is not None:
-                question = question_map.get(question_id)
                 subfields = get_subfields_for_answer(answer, question)
                 if subfields:
                     if question_id not in question_subfields:
