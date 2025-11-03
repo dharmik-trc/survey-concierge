@@ -34,12 +34,26 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
             - last_activity_col: Column index for "Last Activity" field
     """
     question_column_map = {}
-    col_num = 2  # Start at column 2 (column 1 is for session number)
+    col_num = 4  # Start at column 4 (column 1 is #, column 2 is Is Completed, column 3 is Respondent ID)
     question_num = 0
     
     # Number column header (single row)
     cell = ws.cell(row=1, column=1)
     cell.value = "#"
+    cell.fill = styles['header_fill']
+    cell.font = styles['header_font']
+    cell.alignment = styles['header_alignment']
+    
+    # Is Completed column header (single row)
+    cell = ws.cell(row=1, column=2)
+    cell.value = "Is Completed"
+    cell.fill = styles['header_fill']
+    cell.font = styles['header_font']
+    cell.alignment = styles['header_alignment']
+    
+    # Respondent ID column header (single row)
+    cell = ws.cell(row=1, column=3)
+    cell.value = "Respondent ID"
     cell.fill = styles['header_fill']
     cell.font = styles['header_font']
     cell.alignment = styles['header_alignment']
@@ -118,16 +132,9 @@ def build_excel_headers(ws, all_questions, question_subfields, multi_select_ques
             question_column_map[question.id] = {'_main': col_num}
             col_num += 1
     
-    # Status columns
-    is_completed_col = col_num
-    last_activity_col = col_num + 1
-    
-    # Is Completed column (single row)
-    cell = ws.cell(row=1, column=is_completed_col)
-    cell.value = "Is Completed"
-    cell.fill = styles['header_fill']
-    cell.font = styles['header_font']
-    cell.alignment = styles['header_alignment']
+    # Status columns (Is Completed is already at column 2, so only Last Activity remains)
+    is_completed_col = 2  # Fixed at column 2
+    last_activity_col = col_num  # After all question columns
     
     # Last Activity column (single row)
     cell = ws.cell(row=1, column=last_activity_col)
@@ -326,6 +333,27 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
         session_num += 1
         ws.cell(row=row_num, column=1, value=session_num)
         
+        # Is Completed status with color coding (column 2)
+        is_completed_cell = ws.cell(row=row_num, column=2)
+        is_completed_cell.value = "Yes" if session_data['is_completed'] else "No"
+        is_completed_cell.fill = styles['completed_fill'] if session_data['is_completed'] else styles['incomplete_fill']
+        
+        # Write Respondent ID (last segment of survey_response_id UUID for completed, or session_id for partial) (column 3)
+        respondent_id = ''
+        if session_data.get('is_completed') and session_data.get('survey_response_id'):
+            # For completed responses: use survey_response_id (already formatted as last part after split)
+            respondent_id = session_data['survey_response_id']
+        elif not session_data.get('is_completed') and session_data.get('session_id'):
+            # For partial responses: extract last segment of session_id (if UUID format) or last 8 characters
+            session_id_str = str(session_data['session_id'])
+            if '-' in session_id_str:
+                respondent_id = session_id_str.split('-')[-1]
+            else:
+                # If not UUID format, use last 8 characters
+                respondent_id = session_id_str[-8:] if len(session_id_str) >= 8 else session_id_str
+        # Capitalize the respondent ID value (not the column header)
+        ws.cell(row=row_num, column=3, value=respondent_id.upper() if respondent_id else '')
+        
         # Fill in answers for each question
         for question in all_questions:
             answer = session_data['questions'].get(question.id)
@@ -353,11 +381,6 @@ def write_data_rows(ws, sessions, all_questions, question_column_map, is_complet
                     for col_idx in col_map.values():
                         ws.cell(row=row_num, column=col_idx, value='')
         
-        # Is Completed status with color coding
-        is_completed_cell = ws.cell(row=row_num, column=is_completed_col)
-        is_completed_cell.value = "Yes" if session_data['is_completed'] else "No"
-        is_completed_cell.fill = styles['completed_fill'] if session_data['is_completed'] else styles['incomplete_fill']
-        
         # Last Activity timestamp
         last_activity_cell = ws.cell(row=row_num, column=last_activity_col)
         last_activity_cell.value = session_data['last_activity'].strftime('%Y-%m-%d %H:%M:%S')
@@ -378,7 +401,9 @@ def format_worksheet(ws, last_activity_col, all_questions, question_subfields, m
     """
     # Column widths
     ws.column_dimensions['A'].width = 8  # Number column (narrow)
-    for col_idx in range(2, last_activity_col + 1):
+    ws.column_dimensions['B'].width = 15  # Is Completed column
+    ws.column_dimensions['C'].width = 15  # Respondent ID column
+    for col_idx in range(4, last_activity_col + 1):
         col_letter = openpyxl.utils.get_column_letter(col_idx)
         ws.column_dimensions[col_letter].width = 25
     

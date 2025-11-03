@@ -44,6 +44,7 @@ def collect_session_data(survey):
                 'is_completed': False,  # All are incomplete by filter
                 'last_activity': response.updated_at,
                 'first_activity': response.created_at,
+                'session_id': str(session_id),  # Store session_id for Respondent ID (partial responses)
                 'questions': {}
             }
         
@@ -106,6 +107,7 @@ def merge_completed_responses(survey, sessions, completed_session_ids):
             'is_completed': True,
             'last_activity': data['survey_response'].submitted_at,
             'first_activity': data['survey_response'].submitted_at,
+            'survey_response_id': str(response_id).split('-')[-1],  # Store the UUID for Respondent ID
             'questions': {}
         }
         
