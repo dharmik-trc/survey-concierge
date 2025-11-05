@@ -113,8 +113,6 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         elif question_type in ['multiple_choices', 'radio', 'dropdown', 'yes_no', 'fields']:
             if question.options and answer:
                 def is_valid_choice(choice):
-                    print(f"Validating choice: '{choice}', has_other_option: {question.has_other_option}, options: {question.options}")
-                    
                     # Handle combined answer+comment objects
                     if isinstance(choice, dict) and 'answer' in choice:
                         # Extract the actual answer from the combined object
@@ -146,13 +144,10 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
                         other_content = str(choice)[6:].strip()  # Remove "Other:" prefix
                         if not other_content:
                             return False  # Invalid if no content after "Other:"
-                        print(f"Valid 'Other:' choice: '{choice}'")
                         return True
                     # Allow any custom text if the question has "Other" option enabled
                     if question.has_other_option:
-                        print(f"Valid custom text for 'Other' option: '{choice}'")
                         return True  # Allow any custom text for "Other" option
-                    print(f"Invalid choice: '{choice}'")
                     return False
 
                 if isinstance(answer, list):

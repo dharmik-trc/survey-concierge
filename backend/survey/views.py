@@ -141,9 +141,6 @@ def submit_survey_response(request, survey_id):
         ip_address = get_client_ip(request)
         user_agent = request.META.get('HTTP_USER_AGENT', '')
         
-        print(f"Client IP detected: {ip_address}")
-        print(f"User Agent: {user_agent}")
-        
         # Prepare the data for serializer
         response_data = {
             'survey': survey.id,
@@ -151,8 +148,6 @@ def submit_survey_response(request, survey_id):
             'user_agent': user_agent,
             'question_responses': []
         }
-        
-        print(f"Response data being sent to serializer: {response_data}")
         
         # Process the responses from request data
         responses = request.data.get('responses', {})
@@ -202,14 +197,11 @@ def submit_survey_response(request, survey_id):
         
         # Create the survey response
         serializer = SurveyResponseSerializer(data=response_data)
-        print(f"Serializer is valid: {serializer.is_valid()}")
         if not serializer.is_valid():
             print(f"Serializer errors: {serializer.errors}")
             
         if serializer.is_valid():
             survey_response = serializer.save()
-            print(f"Survey response created with ID: {survey_response.id}")
-            print(f"IP address saved: {survey_response.ip_address}")
             
             # Clean up partial responses for this survey and IP after successful submission
             session_id = request.data.get('session_id', '')
@@ -221,7 +213,6 @@ def submit_survey_response(request, survey_id):
                     session_id=session_id,
                     is_completed=False
                 ).update(is_completed=True)
-                print(f"Marked partial responses as completed for session {session_id}")
             
             return Response({
                 'message': 'Survey response submitted successfully',

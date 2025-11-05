@@ -1,8 +1,3 @@
-- combine all the answer one field and type of answer as different field
-- hit the api on every next button click
-- salary questions in the survey
-- Give soft reminder to the user when total sum is 0 (for form numeric questions, example: 27 - salary)
-
 # Survey Concierge - Professional Survey Platform
 
 A modern, full-stack survey platform built with Next.js frontend and Django backend, featuring step-by-step survey forms, real-time validation, and comprehensive response tracking. Survey Concierge provides a professional solution for creating, managing, and analyzing surveys with a beautiful, branded interface.
