@@ -76,8 +76,17 @@ def calculate_analytics(sessions: Dict[str, Dict], questions: List, total_comple
             if question.subfield_validations:
                 for subfield_name, validation in question.subfield_validations.items():
                     field_type = validation.get('type', 'text')
-                    if field_type in ['number', 'positive_number', 'negative_number', 'all_numbers']:
+                    # Include auto_calculate totals as numeric analytics too
+                    if field_type in ['number', 'positive_number', 'negative_number', 'all_numbers', 'auto_calculate']:
                         numeric_subfields.append(subfield_name)
+            # Fallback: if a "Total" subfield exists without explicit numeric validation, include it
+            try:
+                for candidate in ['Total', 'total', 'Sum', 'sum']:
+                    if hasattr(question, 'subfields') and question.subfields and candidate in question.subfields:
+                        if candidate not in numeric_subfields:
+                            numeric_subfields.append(candidate)
+            except Exception:
+                pass
             
             if numeric_subfields:
                 # Has numeric subfields - calculate analytics for each
