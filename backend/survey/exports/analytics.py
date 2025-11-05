@@ -168,15 +168,13 @@ def calculate_choice_analytics(question, sessions: Dict, answered_count: int, sk
     # Count responses
     for session_id, session_data in sessions.items():
         answer = session_data.get('questions', {}).get(question.id)
-        
+
         if answer is None:
             continue
-        
-        total_responses += 1
-        
+
         # Extract selected options
         selected_options = []
-        
+
         if isinstance(answer, list):
             selected_options = answer
         elif isinstance(answer, dict):
@@ -188,7 +186,13 @@ def calculate_choice_analytics(question, sessions: Dict, answered_count: int, sk
                     selected_options = [inner_answer]
         elif answer:
             selected_options = [answer]
-        
+
+        # Skip if no selections were made (do not include in base)
+        if not selected_options or (isinstance(selected_options, list) and len(selected_options) == 0):
+            continue
+
+        total_responses += 1
+
         # Count each selected option
         for selected in selected_options:
             # Handle "Other: custom text" format
