@@ -107,8 +107,8 @@ def export_survey_responses(request, survey_id):
         HttpResponse: Excel file download or error response
     """
     try:
-        # Get survey and questions
-        survey = get_object_or_404(Survey, id=survey_id, is_active=True)
+        # Get survey and questions (allow exports for inactive surveys as well)
+        survey = get_object_or_404(Survey, id=survey_id)
         all_questions = Question.objects.filter(survey=survey).order_by('order', 'created_at')
         
         # Step 1: Collect session data from partial responses (grouped by session_id)
@@ -212,8 +212,8 @@ def export_analytics(request, survey_id):
         HttpResponse: Excel file download or error response
     """
     try:
-        # Get survey and questions
-        survey = get_object_or_404(Survey, id=survey_id, is_active=True)
+        # Get survey and questions (allow exports for inactive surveys as well)
+        survey = get_object_or_404(Survey, id=survey_id)
         all_questions = Question.objects.filter(survey=survey).order_by('order', 'created_at')
         
         # Collect ONLY fully completed survey responses (SurveyResponse table only)
