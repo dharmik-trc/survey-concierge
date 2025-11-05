@@ -106,6 +106,10 @@ export default function Dashboard() {
     }
   };
 
+  const openAnalyticsPage = (surveyId: string) => {
+    window.open(`/dashboard-admin/analytics/${surveyId}`, "_blank");
+  };
+
   // Show login form if not authenticated
   if (!isAuthenticated) {
     return (
@@ -342,62 +346,84 @@ export default function Dashboard() {
                           )}
                         </button>
                       </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => exportResponses(survey.id)}
+                          disabled={exportingResponses}
+                          className="flex-1 px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-lg hover:bg-green-100 transition-colors duration-200 border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                          title="Export all survey responses as Excel (3 tabs: Partial, Completed, All)"
+                        >
+                          {exportingResponses ? (
+                            "Exporting..."
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              <span>Export Responses</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => generateAnalytics(survey.id)}
+                          disabled={generatingAnalytics === survey.id}
+                          className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 text-sm font-medium rounded-lg hover:from-purple-100 hover:to-pink-100 transition-colors duration-200 border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                          title="Export analytics and download Excel file with % and counts for each question"
+                        >
+                          {generatingAnalytics === survey.id ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-600 border-t-transparent flex-shrink-0"></div>
+                              <span>Exporting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-4 h-4 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                                />
+                              </svg>
+                              <span>Export Analytics</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <button
-                        onClick={() => exportResponses(survey.id)}
-                        disabled={exportingResponses}
-                        className="w-full px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-lg hover:bg-green-100 transition-colors duration-200 border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        title="Export all survey responses as Excel (3 tabs: Partial, Completed, All)"
+                        onClick={() => openAnalyticsPage(survey.id)}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 text-sm font-medium rounded-lg hover:from-indigo-100 hover:to-purple-100 transition-colors duration-200 border border-indigo-200 flex items-center justify-center gap-2"
+                        title="Open analytics dashboard with filter and segmentation options"
                       >
-                        {exportingResponses ? (
-                          "Exporting..."
-                        ) : (
-                          <>
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                            Export Responses
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => generateAnalytics(survey.id)}
-                        disabled={generatingAnalytics === survey.id}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 text-sm font-medium rounded-lg hover:from-purple-100 hover:to-pink-100 transition-colors duration-200 border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        title="Generate analytics and download Excel file with % and counts for each question"
-                      >
-                        {generatingAnalytics === survey.id ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-600 border-t-transparent"></div>
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                              />
-                            </svg>
-                            Generate Analytics
-                          </>
-                        )}
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        Go to Analytics
                       </button>
                     </div>
                   </div>

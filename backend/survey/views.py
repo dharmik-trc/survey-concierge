@@ -110,8 +110,14 @@ def survey_detail(request, survey_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def questions_by_survey(request, survey_id):
-    """Get all questions for a specific survey"""
-    survey = get_object_or_404(Survey, id=survey_id, is_active=True)
+    """Get all questions for a specific survey. By default returns only for active surveys; add include_inactive=true to include questions for inactive surveys."""
+    include_inactive = request.GET.get('include_inactive', 'false').lower() in ['1', 'true', 'yes']
+    
+    if include_inactive:
+        survey = get_object_or_404(Survey, id=survey_id)
+    else:
+        survey = get_object_or_404(Survey, id=survey_id, is_active=True)
+    
     questions = survey.questions.all()
     serializer = QuestionSerializer(questions, many=True)
     return Response(serializer.data)

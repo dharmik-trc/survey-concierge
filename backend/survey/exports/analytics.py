@@ -410,10 +410,21 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
     numeric_values_sorted = sorted(numeric_values)
     count = len(numeric_values)
     
-    # Quartiles
-    q1 = statistics.quantiles(numeric_values, n=4)[0] if count > 0 else 0
-    median = statistics.median(numeric_values)
-    q3 = statistics.quantiles(numeric_values, n=4)[2] if count > 0 else 0
+    # Quartiles (require at least 2 data points)
+    if count >= 2:
+        q1 = statistics.quantiles(numeric_values, n=4)[0]
+        median = statistics.median(numeric_values)
+        q3 = statistics.quantiles(numeric_values, n=4)[2]
+    elif count == 1:
+        # Single value: use it for all quartiles
+        q1 = numeric_values[0]
+        median = numeric_values[0]
+        q3 = numeric_values[0]
+    else:
+        # No values
+        q1 = 0
+        median = 0
+        q3 = 0
     
     return {
         'type': 'numeric',
@@ -421,13 +432,13 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
         'count': count,
         'answered_count': answered_count,
         'skipped_count': skipped_count,
-        'min': min(numeric_values),
+        'min': min(numeric_values) if numeric_values else 0,
         'q1': round(q1, 2),
         'median': round(median, 2),
         'q3': round(q3, 2),
-        'max': max(numeric_values),
-        'average': round(statistics.mean(numeric_values), 2),
-        'sum': round(sum(numeric_values), 2)
+        'max': max(numeric_values) if numeric_values else 0,
+        'average': round(statistics.mean(numeric_values), 2) if numeric_values else 0,
+        'sum': round(sum(numeric_values), 2) if numeric_values else 0
     }
 
 
@@ -503,19 +514,30 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
             }
         else:
             count = base_count
-            # Quartiles with zeros included
-            q1 = statistics.quantiles(values, n=4)[0] if count > 0 else 0
-            median = statistics.median(values)
-            q3 = statistics.quantiles(values, n=4)[2] if count > 0 else 0
+            # Quartiles with zeros included (require at least 2 data points)
+            if len(values) >= 2:
+                q1 = statistics.quantiles(values, n=4)[0]
+                median = statistics.median(values)
+                q3 = statistics.quantiles(values, n=4)[2]
+            elif len(values) == 1:
+                # Single value: use it for all quartiles
+                q1 = values[0]
+                median = values[0]
+                q3 = values[0]
+            else:
+                # No values
+                q1 = 0
+                median = 0
+                q3 = 0
 
             subfield_analytics[subfield_name] = {
                 'count': count,
-                'min': min(values),
+                'min': min(values) if values else 0,
                 'q1': round(q1, 2),
                 'median': round(median, 2),
                 'q3': round(q3, 2),
-                'max': max(values),
-                'average': round(statistics.mean(values), 2),
+                'max': max(values) if values else 0,
+                'average': round(statistics.mean(values), 2) if values else 0,
                 'sum': round(sum(values), 2),
             }
 
