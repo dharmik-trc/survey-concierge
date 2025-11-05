@@ -421,39 +421,63 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
 def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_count: int, skipped_count: int, numeric_subfields: List[str]) -> Dict[str, Any]:
     """
     Calculate statistics for form_fields questions with numeric subfields.
-    
-    Returns analytics per numeric subfield, each with its own stats.
+
+    For total-sum style questions (numeric form_fields):
+    - Treat blank/missing subfield values as 0 for respondents who answered at least one numeric subfield
+    - Exclude respondents who left ALL numeric subfields blank (do not contribute to base)
+    - Use the same base (respondent count) across all subfields to avoid overstated averages
     """
-    # Dictionary to store numeric values for each subfield
-    subfield_values = {subfield: [] for subfield in numeric_subfields}
-    
-    # Extract numeric values from responses for each subfield
+    # Collect per-respondent parsed values for numeric subfields
+    respondent_values: List[Dict[str, float]] = []
+
     for session_id, session_data in sessions.items():
         answer = session_data.get('questions', {}).get(question.id)
-        
+
         if answer is None:
             continue
-        
+
         # Extract answer from dict if needed
         if isinstance(answer, dict) and 'answer' in answer:
             answer = answer.get('answer')
-        
-        # Process each numeric subfield
-        if isinstance(answer, dict):
-            for subfield_name in numeric_subfields:
-                if subfield_name in answer:
-                    value = answer[subfield_name]
-                    parsed = _parse_numeric_value(value)
-                    if parsed is not None:
-                        subfield_values[subfield_name].append(parsed)
-    
-    # Calculate analytics for each subfield
-    subfield_analytics = {}
+
+        if not isinstance(answer, dict):
+            continue
+
+        # Parse numeric values for this respondent
+        parsed_map: Dict[str, float] = {}
+        any_numeric_present = False
+        for subfield_name in numeric_subfields:
+            raw_val = answer.get(subfield_name)
+            parsed = _parse_numeric_value(raw_val)
+            if parsed is not None:
+                parsed_map[subfield_name] = float(parsed)
+                any_numeric_present = True
+
+        # Exclude respondents with ALL blanks across numeric subfields
+        if not any_numeric_present:
+            continue
+
+        # For missing subfields, treat as zero to keep consistent base
+        for subfield_name in numeric_subfields:
+            if subfield_name not in parsed_map:
+                parsed_map[subfield_name] = 0.0
+
+        respondent_values.append(parsed_map)
+
+    base_count = len(respondent_values)
+
+    # Build values per subfield with zero-filled base
+    subfield_values: Dict[str, List[float]] = {sf: [] for sf in numeric_subfields}
+    for rv in respondent_values:
+        for sf in numeric_subfields:
+            subfield_values[sf].append(rv.get(sf, 0.0))
+
+    # Calculate analytics for each subfield using the same base
+    subfield_analytics: Dict[str, Any] = {}
     for subfield_name in numeric_subfields:
         values = subfield_values[subfield_name]
-        
-        if not values:
-            # No valid numeric values for this subfield
+
+        if base_count == 0:
             subfield_analytics[subfield_name] = {
                 'count': 0,
                 'min': 'N/A',
@@ -465,11 +489,12 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
                 'sum': 'N/A',
             }
         else:
-            count = len(values)
+            count = base_count
+            # Quartiles with zeros included
             q1 = statistics.quantiles(values, n=4)[0] if count > 0 else 0
             median = statistics.median(values)
             q3 = statistics.quantiles(values, n=4)[2] if count > 0 else 0
-            
+
             subfield_analytics[subfield_name] = {
                 'count': count,
                 'min': min(values),
@@ -480,12 +505,13 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
                 'average': round(statistics.mean(values), 2),
                 'sum': round(sum(values), 2),
             }
-    
+
     return {
         'type': 'form_fields_numeric',
         'question_text': question.question_text,
         'answered_count': answered_count,
         'skipped_count': skipped_count,
+        'base_count': base_count,
         'subfields': subfield_analytics
     }
 
