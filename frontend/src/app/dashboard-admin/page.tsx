@@ -37,7 +37,7 @@ export default function Dashboard() {
       try {
         setLoading(true);
         setError(null);
-        const data = await apiService.getSurveys();
+        const data = await apiService.getSurveys({ includeInactive: true });
         setSurveys(data);
       } catch (err) {
         setError(
@@ -284,9 +284,15 @@ export default function Dashboard() {
                         </svg>
                         {new Date(survey.created_at).toLocaleDateString()}
                       </span>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 font-medium">
-                        Active
-                      </span>
+                      {survey.is_active ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 font-medium">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-800 font-medium">
+                          Inactive
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-3 mt-auto">

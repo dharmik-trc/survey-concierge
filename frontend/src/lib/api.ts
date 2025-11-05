@@ -117,13 +117,35 @@ class ApiService {
   }
 
   // Get list of all surveys
-  async getSurveys(signal?: AbortSignal): Promise<SurveyListItem[]> {
-    return this.request<SurveyListItem[]>("/surveys/", { signal });
+  async getSurveys(options?: {
+    includeInactive?: boolean;
+    signal?: AbortSignal;
+  }): Promise<SurveyListItem[]> {
+    const params = new URLSearchParams();
+    if (options?.includeInactive) params.set("include_inactive", "true");
+    const qs = params.toString();
+    const endpoint = `/surveys/${qs ? `?${qs}` : ""}`;
+    return this.request<SurveyListItem[]>(endpoint, {
+      signal: options?.signal,
+    });
   }
 
   // Get a specific survey with all its questions
   async getSurvey(surveyId: string, signal?: AbortSignal): Promise<Survey> {
     return this.request<Survey>(`/surveys/${surveyId}/`, { signal });
+  }
+
+  // Get survey meta, including inactive (minimal fields when inactive)
+  async getSurveyMeta(
+    surveyId: string,
+    signal?: AbortSignal
+  ): Promise<
+    | { id: string; title: string; description: string; is_active: boolean }
+    | Survey
+  > {
+    return this.request(`/surveys/${surveyId}/?include_inactive=true`, {
+      signal,
+    });
   }
 
   // Get all questions for a specific survey

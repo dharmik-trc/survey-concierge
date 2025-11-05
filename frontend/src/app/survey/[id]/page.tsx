@@ -11,8 +11,6 @@ import {
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
 import React from "react"; // Added missing import for React
-import ConciergeLogo from "../../../components/ConciergeLogo";
-import SurveyLogo from "../../../components/SurveyLogo";
 import SearchableDropdown from "../../../components/SearchableDropdown";
 
 interface SurveyResponse {
@@ -170,6 +168,7 @@ export default function SurveyPage({
   const [survey, setSurvey] = useState<SurveyType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isClosed, setIsClosed] = useState<boolean>(false);
   const [responses, setResponses] = useState<SurveyResponse>({});
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
     {}
@@ -310,7 +309,27 @@ export default function SurveyPage({
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch survey");
+        if (err instanceof Error) {
+          const msg = err.message || "Failed to fetch survey";
+          if (msg.includes("404")) {
+            // Check if survey exists but is inactive
+            try {
+              const meta: any = await apiService.getSurveyMeta(surveyId);
+              if (meta && meta.is_active === false) {
+                setIsClosed(true);
+                setError(null);
+              } else {
+                setError("API request failed: 404 Not Found");
+              }
+            } catch {
+              setError("API request failed: 404 Not Found");
+            }
+          } else {
+            setError(msg);
+          }
+        } else {
+          setError("Failed to fetch survey");
+        }
       } finally {
         setLoading(false);
       }
@@ -2535,6 +2554,23 @@ export default function SurveyPage({
     );
   }
 
+  if (isClosed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="bg-white border border-yellow-200 rounded-xl p-8 max-w-md shadow-lg text-center">
+          <div className="text-yellow-500 text-4xl mb-4">⏳</div>
+          <h2 className="text-xl font-semibold text-yellow-800 mb-2">
+            This survey has been closed
+          </h2>
+          <p className="text-gray-700 text-sm">
+            Thank you for your interest. Please contact the survey administrator
+            for further information.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
@@ -2604,22 +2640,7 @@ export default function SurveyPage({
           "linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #faf5ff 100%)",
       }}
     >
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-100 flex-shrink-0">
-        <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-1 sm:py-1">
-          <div className="flex items-center justify-between">
-            {/* Survey Company Logo on the left */}
-            <div className="flex-shrink-0">
-              <SurveyLogo size="md" logoSrc={survey?.logo_url} />
-            </div>
-
-            {/* TSC Concierge Logo on the right */}
-            <div className="flex-shrink-0 ml-auto">
-              <ConciergeLogo size="md" />
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Header removed per request */}
 
       {/* Bottom-Right Save Notification */}
       {showSaveNotification && (

@@ -68,15 +68,41 @@ def upload_excel(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def survey_list(request):
-    """Get list of all active surveys"""
-    surveys = Survey.objects.filter(is_active=True)
+    """Get list of surveys. By default returns only active; add include_inactive=true to include all."""
+    include_inactive = request.GET.get('include_inactive', 'false').lower() in ['1', 'true', 'yes']
+    if include_inactive:
+        surveys = Survey.objects.all()
+    else:
+        surveys = Survey.objects.filter(is_active=True)
     serializer = SurveyListSerializer(surveys, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def survey_detail(request, survey_id):
-    """Get a specific survey with all its questions"""
+    """Get a specific survey with all its questions
+
+    By default returns only active surveys. If include_inactive=true is provided and
+    the survey exists but is inactive, return minimal metadata indicating inactive status.
+    """
+    include_inactive = request.GET.get('include_inactive', 'false').lower() in ['1', 'true', 'yes']
+
+    if include_inactive:
+        # Try to get survey regardless of active flag
+        survey = get_object_or_404(Survey, id=survey_id)
+        if not survey.is_active:
+            # Return minimal meta so clients can show a friendly "closed" message
+            return Response({
+                'id': str(survey.id),
+                'title': survey.title,
+                'description': survey.description,
+                'is_active': survey.is_active
+            })
+        # If active, fall through to normal serializer with questions
+        serializer = SurveySerializer(survey)
+        return Response(serializer.data)
+
+    # Default behaviour: only active surveys are accessible
     survey = get_object_or_404(Survey, id=survey_id, is_active=True)
     serializer = SurveySerializer(survey)
     return Response(serializer.data)
