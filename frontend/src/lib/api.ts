@@ -300,8 +300,10 @@ class ApiService {
     surveyId: string,
     filters: Array<{
       question_id: number;
-      selected_options: string[];
-    }>
+      selected_options?: string[];
+      numeric_range?: [number | null, number | null];
+    }>,
+    excludeOpenText?: boolean
   ): Promise<void> {
     const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/export-filtered/`;
     const response = await fetch(url, {
@@ -311,6 +313,7 @@ class ApiService {
       },
       body: JSON.stringify({
         filters: filters,
+        exclude_open_text: excludeOpenText || false,
       }),
     });
 
@@ -363,14 +366,17 @@ class ApiService {
     surveyId: string,
     filters: Array<{
       question_id: number;
-      selected_options: string[];
-    }>
+      selected_options?: string[];
+      numeric_range?: [number | null, number | null];
+    }>,
+    excludeOpenText?: boolean
   ): Promise<{
     filtered_count: number;
     total_count: number;
     filters?: Array<{
       filter_question: string;
-      selected_options: string[];
+      selected_options?: string[];
+      numeric_range?: string;
     }>;
     filter_question?: string;
     selected_options?: string[];
@@ -394,6 +400,7 @@ class ApiService {
     }>;
     total_questions: number;
     showing_questions: number;
+    exclude_open_text?: boolean;
     message?: string;
   }> {
     const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/preview-filtered/`;
@@ -404,6 +411,7 @@ class ApiService {
       },
       body: JSON.stringify({
         filters: filters,
+        exclude_open_text: excludeOpenText || false,
       }),
     });
 

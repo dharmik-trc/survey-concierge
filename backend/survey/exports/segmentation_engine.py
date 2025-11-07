@@ -19,7 +19,11 @@ def _parse_numeric_value(value) -> Optional[float]:
         try:
             return float(value.strip())
         except (ValueError, AttributeError):
-            return None
+            cleaned = value.strip().replace(',', '')
+            try:
+                return float(cleaned)
+            except (ValueError, AttributeError):
+                return None
     return None
 
 

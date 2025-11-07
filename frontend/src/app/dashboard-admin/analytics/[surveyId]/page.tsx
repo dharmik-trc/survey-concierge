@@ -21,9 +21,12 @@ export default function AnalyticsPage() {
   const [filterConfigs, setFilterConfigs] = useState<
     Array<{
       questionId: string;
-      selectedOptions: string[];
+      selectedOptions?: string[];
+      numericRange?: [number | null, number | null];
+      filterType?: 'choice' | 'numeric';
     }>
   >([]);
+  const [excludeOpenText, setExcludeOpenText] = useState(false);
   const [filterPreviewData, setFilterPreviewData] = useState<any>(null);
   const [loadingFilterPreview, setLoadingFilterPreview] = useState(false);
   const [generatingFiltered, setGeneratingFiltered] = useState(false);
@@ -77,7 +80,13 @@ export default function AnalyticsPage() {
     if (
       activeTab !== "filter" ||
       filterConfigs.length === 0 ||
-      filterConfigs.some((f) => !f.questionId || f.selectedOptions.length === 0)
+      filterConfigs.some((f) => {
+        if (!f.questionId) return true;
+        if (f.filterType === "numeric") {
+          return !f.numericRange;
+        }
+        return !f.selectedOptions || f.selectedOptions.length === 0;
+      })
     ) {
       setFilterPreviewData(null);
       return;
@@ -91,13 +100,21 @@ export default function AnalyticsPage() {
     setLoadingFilterPreview(true);
     filterPreviewTimeoutRef.current = setTimeout(async () => {
       try {
-        const filters = filterConfigs.map((f) => ({
-          question_id: parseInt(f.questionId),
-          selected_options: f.selectedOptions,
-        }));
+        const filters = filterConfigs.map((f) => {
+          const filter: any = {
+            question_id: parseInt(f.questionId),
+          };
+          if (f.filterType === 'numeric' && f.numericRange) {
+            filter.numeric_range = f.numericRange;
+          } else if (f.selectedOptions) {
+            filter.selected_options = f.selectedOptions;
+          }
+          return filter;
+        });
         const preview = await apiService.previewFilteredAnalytics(
           surveyId,
-          filters
+          filters,
+          excludeOpenText
         );
         setFilterPreviewData(preview);
       } catch (err) {
@@ -113,7 +130,7 @@ export default function AnalyticsPage() {
         clearTimeout(filterPreviewTimeoutRef.current);
       }
     };
-  }, [activeTab, surveyId, filterConfigs]);
+  }, [activeTab, surveyId, filterConfigs, excludeOpenText]);
 
   // Fetch preview when dimensions change (with debouncing)
   useEffect(() => {
@@ -175,20 +192,33 @@ export default function AnalyticsPage() {
   const exportFiltered = async () => {
     if (
       filterConfigs.length === 0 ||
-      filterConfigs.some((f) => !f.questionId || f.selectedOptions.length === 0)
+      filterConfigs.some((f) => {
+        if (!f.questionId) return true;
+        if (f.filterType === 'numeric') {
+          return !f.numericRange;
+        }
+        return !f.selectedOptions || f.selectedOptions.length === 0;
+      })
     ) {
       alert(
-        "Please add at least one filter with a question and at least one option"
+        "Please add at least one filter with a question and valid filter criteria"
       );
       return;
     }
     try {
       setGeneratingFiltered(true);
-      const filters = filterConfigs.map((f) => ({
-        question_id: parseInt(f.questionId),
-        selected_options: f.selectedOptions,
-      }));
-      await apiService.exportFilteredAnalytics(surveyId, filters);
+      const filters = filterConfigs.map((f) => {
+        const filter: any = {
+          question_id: parseInt(f.questionId),
+        };
+        if (f.filterType === 'numeric' && f.numericRange) {
+          filter.numeric_range = f.numericRange;
+        } else if (f.selectedOptions) {
+          filter.selected_options = f.selectedOptions;
+        }
+        return filter;
+      });
+      await apiService.exportFilteredAnalytics(surveyId, filters, excludeOpenText);
     } catch (err: any) {
       console.error("Failed to export filtered analytics:", err);
       alert(
@@ -287,12 +317,22 @@ export default function AnalyticsPage() {
                             {filter.filter_question}
                           </span>
                         </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">Options:</span>{" "}
-                          <span className="text-gray-900">
-                            {filter.selected_options?.join(", ")}
-                          </span>
-                        </div>
+                        {filter.selected_options && (
+                          <div className="text-sm">
+                            <span className="text-gray-600">Options:</span>{" "}
+                            <span className="text-gray-900">
+                              {filter.selected_options.join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        {filter.numeric_range && (
+                          <div className="text-sm">
+                            <span className="text-gray-600">Range:</span>{" "}
+                            <span className="text-gray-900">
+                              {filter.numeric_range}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )
                   ) || (
@@ -423,12 +463,20 @@ export default function AnalyticsPage() {
                           All{" "}
                           <strong>{filterPreviewData.total_questions}</strong>{" "}
                           questions with complete analytics
+                          {filterPreviewData.exclude_open_text && (
+                            <span className="text-orange-700">
+                              {" "}
+                              (open text questions excluded)
+                            </span>
+                          )}
                         </li>
                         <li>
                           Response counts, percentages, and statistics for each
                           question
                         </li>
-                        <li>All comments and open-text responses</li>
+                        {!filterPreviewData.exclude_open_text && (
+                          <li>All comments and open-text responses</li>
+                        )}
                       </ul>
                     </div>
                   </div>
@@ -570,28 +618,69 @@ export default function AnalyticsPage() {
                     use <strong>AND logic</strong> - responses must match ALL
                     filters. Within each filter, options use{" "}
                     <strong>OR logic</strong> - responses matching ANY option
-                    are included.
+                    are included. You can filter by choice questions or numeric
+                    ranges (e.g., staff size).
                   </p>
+                </div>
+
+                {/* Exclude Open Text Toggle */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={excludeOpenText}
+                      onChange={(e) => setExcludeOpenText(e.target.checked)}
+                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">
+                        Exclude Open Text Questions
+                      </span>
+                      <p className="text-xs text-gray-600 mt-1">
+                        When enabled, open text questions (text, paragraph) will
+                        be excluded from the export to maintain question order
+                        and allow easy copy/paste of data.
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">
                     Filters
                   </h3>
-                  <button
-                    onClick={() => {
-                      setFilterConfigs([
-                        ...filterConfigs,
-                        {
-                          questionId: "",
-                          selectedOptions: [],
-                        },
-                      ]);
-                    }}
-                    className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    + Add Filter
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setFilterConfigs([
+                          ...filterConfigs,
+                          {
+                            questionId: "",
+                            selectedOptions: [],
+                            filterType: "choice",
+                          },
+                        ]);
+                      }}
+                      className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      + Add Choice Filter
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilterConfigs([
+                          ...filterConfigs,
+                          {
+                            questionId: "",
+                            numericRange: [null, null],
+                            filterType: "numeric",
+                          },
+                        ]);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      + Add Numeric Filter
+                    </button>
+                  </div>
                 </div>
 
                 {filterConfigs.length === 0 && (
@@ -629,41 +718,86 @@ export default function AnalyticsPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Question (Choice Questions Only)
+                        Filter Type
+                      </label>
+                      <select
+                        value={filterConfig.filterType || "choice"}
+                        onChange={(e) => {
+                          const newFilters = [...filterConfigs];
+                          newFilters[filterIdx] = {
+                            questionId: "",
+                            filterType: e.target.value as "choice" | "numeric",
+                            selectedOptions: e.target.value === "choice" ? [] : undefined,
+                            numericRange: e.target.value === "numeric" ? [null, null] : undefined,
+                          };
+                          setFilterConfigs(newFilters);
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black mb-4"
+                      >
+                        <option value="choice">Choice Question Filter</option>
+                        <option value="numeric">Numeric Range Filter</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {filterConfig.filterType === "numeric"
+                          ? "Select Numeric Question"
+                          : "Select Question (Choice Questions Only)"}
                       </label>
                       <select
                         value={filterConfig.questionId}
                         onChange={(e) => {
                           const newFilters = [...filterConfigs];
                           newFilters[filterIdx] = {
+                            ...newFilters[filterIdx],
                             questionId: e.target.value,
-                            selectedOptions: [],
+                            selectedOptions: filterConfig.filterType === "choice" ? [] : undefined,
+                            numericRange: filterConfig.filterType === "numeric" ? [null, null] : undefined,
                           };
                           setFilterConfigs(newFilters);
                         }}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
                       >
                         <option value="">Select a question...</option>
-                        {surveyQuestions
-                          .filter(
-                            (q) =>
-                              q.primary_type === "form" &&
-                              [
-                                "radio",
-                                "dropdown",
-                                "multiple_choices",
-                              ].includes(q.secondary_type || "")
-                          )
-                          .map((q) => (
-                            <option key={q.id} value={q.id}>
-                              Q{q.order + 1}: {q.question_text.substring(0, 60)}
-                              {q.question_text.length > 60 ? "..." : ""}
-                            </option>
-                          ))}
+                        {filterConfig.filterType === "numeric"
+                          ? surveyQuestions
+                              .filter(
+                                (q) =>
+                                  (q.primary_type === "open_text" &&
+                                    ["number", "positive_number", "negative_number"].includes(
+                                      q.secondary_type || ""
+                                    )) ||
+                                  (q.primary_type === "form" &&
+                                    q.secondary_type === "form_fields")
+                              )
+                              .map((q) => (
+                                <option key={q.id} value={q.id}>
+                                  Q{q.order + 1}: {q.question_text.substring(0, 60)}
+                                  {q.question_text.length > 60 ? "..." : ""}
+                                </option>
+                              ))
+                          : surveyQuestions
+                              .filter(
+                                (q) =>
+                                  q.primary_type === "form" &&
+                                  [
+                                    "radio",
+                                    "dropdown",
+                                    "multiple_choices",
+                                  ].includes(q.secondary_type || "")
+                              )
+                              .map((q) => (
+                                <option key={q.id} value={q.id}>
+                                  Q{q.order + 1}: {q.question_text.substring(0, 60)}
+                                  {q.question_text.length > 60 ? "..." : ""}
+                                </option>
+                              ))}
                       </select>
                     </div>
 
                     {filterConfig.questionId &&
+                      filterConfig.filterType === "choice" &&
                       (() => {
                         const selectedQ = surveyQuestions.find(
                           (q) => q.id === parseInt(filterConfig.questionId)
@@ -681,7 +815,7 @@ export default function AnalyticsPage() {
                                 >
                                   <input
                                     type="checkbox"
-                                    checked={filterConfig.selectedOptions.includes(
+                                    checked={filterConfig.selectedOptions?.includes(
                                       option
                                     )}
                                     onChange={(e) => {
@@ -690,19 +824,18 @@ export default function AnalyticsPage() {
                                         newFilters[filterIdx] = {
                                           ...newFilters[filterIdx],
                                           selectedOptions: [
-                                            ...newFilters[filterIdx]
-                                              .selectedOptions,
+                                            ...(newFilters[filterIdx]
+                                              .selectedOptions || []),
                                             option,
                                           ],
                                         };
                                       } else {
                                         newFilters[filterIdx] = {
                                           ...newFilters[filterIdx],
-                                          selectedOptions: newFilters[
-                                            filterIdx
-                                          ].selectedOptions.filter(
-                                            (opt) => opt !== option
-                                          ),
+                                          selectedOptions: (
+                                            newFilters[filterIdx]
+                                              .selectedOptions || []
+                                          ).filter((opt) => opt !== option),
                                         };
                                       }
                                       setFilterConfigs(newFilters);
@@ -716,12 +849,92 @@ export default function AnalyticsPage() {
                               ))}
                             </div>
                             <p className="mt-2 text-xs text-gray-500">
-                              Selected: {filterConfig.selectedOptions.length}{" "}
+                              Selected: {filterConfig.selectedOptions?.length || 0}{" "}
                               option(s)
                             </p>
                           </div>
                         ) : null;
                       })()}
+
+                    {filterConfig.questionId &&
+                      filterConfig.filterType === "numeric" && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Numeric Range (leave blank for unbounded)
+                          </label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Minimum (inclusive)
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  filterConfig.numericRange?.[0] === null ||
+                                  filterConfig.numericRange?.[0] === undefined
+                                    ? ""
+                                    : filterConfig.numericRange[0]
+                                }
+                                onChange={(e) => {
+                                  const newFilters = [...filterConfigs];
+                                  const minValue =
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value);
+                                  newFilters[filterIdx] = {
+                                    ...newFilters[filterIdx],
+                                    numericRange: [
+                                      minValue,
+                                      newFilters[filterIdx].numericRange?.[1] ||
+                                        null,
+                                    ],
+                                  };
+                                  setFilterConfigs(newFilters);
+                                }}
+                                placeholder="Min (or leave blank)"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Maximum (inclusive)
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  filterConfig.numericRange?.[1] === null ||
+                                  filterConfig.numericRange?.[1] === undefined
+                                    ? ""
+                                    : filterConfig.numericRange[1]
+                                }
+                                onChange={(e) => {
+                                  const newFilters = [...filterConfigs];
+                                  const maxValue =
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value);
+                                  newFilters[filterIdx] = {
+                                    ...newFilters[filterIdx],
+                                    numericRange: [
+                                      newFilters[filterIdx].numericRange?.[0] ||
+                                        null,
+                                      maxValue,
+                                    ],
+                                  };
+                                  setFilterConfigs(newFilters);
+                                }}
+                                placeholder="Max (or leave blank)"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Responses with values within this range will be
+                            included. Leave both blank to include all numeric
+                            responses.
+                          </p>
+                        </div>
+                      )}
                   </div>
                 ))}
 
@@ -732,9 +945,15 @@ export default function AnalyticsPage() {
                     disabled={
                       generatingFiltered ||
                       filterConfigs.length === 0 ||
-                      filterConfigs.some(
-                        (f) => !f.questionId || f.selectedOptions.length === 0
-                      )
+                      filterConfigs.some((f) => {
+                        if (!f.questionId) return true;
+                        if (f.filterType === "numeric") {
+                          return !f.numericRange;
+                        }
+                        return (
+                          !f.selectedOptions || f.selectedOptions.length === 0
+                        );
+                      })
                     }
                     className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >

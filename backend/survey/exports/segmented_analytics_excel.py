@@ -5,7 +5,7 @@ Exports analytics with segments side-by-side in columns.
 """
 
 import openpyxl
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from .excel_styles import create_excel_styles
 
@@ -55,6 +55,9 @@ def create_segmented_analytics_excel(
     segments = segment_order or ['All responses'] + [s for s in segment_analytics.keys() if s != 'All responses']
     num_segments = len(segments)
     cols_per_segment = 2  # Count and Percentage
+
+    # Cache questions for quick lookup (preserves original ordering)
+    question_map = {question.id: question for question in questions}
     
     row_num = 1
     question_num = 0
@@ -128,7 +131,14 @@ def create_segmented_analytics_excel(
         
         if analytics_type == 'choice':
             row_num = _write_segmented_choice_analytics(
-                ws, segment_analytics, question_id, segments, row_num, cols_per_segment, border
+                ws,
+                segment_analytics,
+                question_id,
+                segments,
+                row_num,
+                cols_per_segment,
+                border,
+                question_map
             )
         elif analytics_type == 'form_fields_numeric':
             row_num = _write_segmented_form_fields_numeric_analytics(
@@ -159,46 +169,96 @@ def create_segmented_analytics_excel(
 
 
 def _write_segmented_choice_analytics(
-    ws, segment_analytics: Dict[str, Dict], question_id: int,
-    segments: List[str], start_row: int, cols_per_segment: int, border: Border
+    ws,
+    segment_analytics: Dict[str, Dict],
+    question_id: int,
+    segments: List[str],
+    start_row: int,
+    cols_per_segment: int,
+    border: Border,
+    question_map: Dict[int, any],
 ) -> int:
-    """Write choice analytics side-by-side for all segments."""
+    """Write choice analytics side-by-side for all segments.
+
+    Supports both legacy ('options') and current ('results') analytics payloads
+    and preserves the original option ordering from the survey definition.
+    """
+
     row_num = start_row
-    
-    # Collect all options across all segments
-    all_options = set()
+
+    def _normalize_label(raw_option) -> str:
+        if raw_option is None:
+            return ""
+        if isinstance(raw_option, dict):
+            for key in ("option", "label", "value", "text"):
+                if raw_option.get(key):
+                    return str(raw_option[key])
+            # Fallback to full dict representation
+            return str(raw_option)
+        return str(raw_option)
+
+    def _extract_choice_rows(q_analytics: Dict[str, any]) -> List[Dict[str, any]]:
+        if not q_analytics or q_analytics.get("type") != "choice":
+            return []
+        data = q_analytics.get("results")
+        if not data:
+            data = q_analytics.get("options", [])
+        if not isinstance(data, list):
+            return []
+        return data
+
+    # Preserve original option ordering from the survey definition
+    ordered_options: List[str] = []
+    question = question_map.get(question_id)
+    if question and question.options:
+        for opt in question.options:
+            label = _normalize_label(opt)
+            if label and label not in ordered_options:
+                ordered_options.append(label)
+
+    # Accumulate any additional options encountered in analytics (e.g. "Other")
     for seg in segments:
-        seg_analytics = segment_analytics.get(seg, {})
-        q_analytics = seg_analytics.get(question_id)
-        if q_analytics and q_analytics.get('type') == 'choice':
-            options_data = q_analytics.get('options', [])
-            for opt in options_data:
-                all_options.add(opt.get('option', ''))
-    
+        q_analytics = segment_analytics.get(seg, {}).get(question_id)
+        for entry in _extract_choice_rows(q_analytics):
+            label = _normalize_label(entry)
+            if label and label not in ordered_options:
+                ordered_options.append(label)
+
+    # Nothing to write
+    if not ordered_options:
+        ws.cell(row=row_num, column=1, value="No response data").border = border
+        row_num += 1
+        return row_num
+
     # Write each option with counts/percentages per segment
-    for option in sorted(all_options):
-        ws.cell(row=row_num, column=1, value=option).border = border
+    for option_label in ordered_options:
+        ws.cell(row=row_num, column=1, value=option_label).border = border
         col = 2
         for seg in segments:
             seg_analytics = segment_analytics.get(seg, {})
             q_analytics = seg_analytics.get(question_id)
             count = 0
             percentage = 0.0
+
             if q_analytics and q_analytics.get('type') == 'choice':
-                options_data = q_analytics.get('options', [])
-                for opt in options_data:
-                    if opt.get('option') == option:
-                        count = opt.get('count', 0)
-                        percentage = opt.get('percentage', 0.0)
+                for entry in _extract_choice_rows(q_analytics):
+                    label = _normalize_label(entry)
+                    if label == option_label:
+                        if isinstance(entry, dict):
+                            count = entry.get('count', 0) or 0
+                            percentage = entry.get('percentage')
+                            if percentage is None:
+                                percentage = entry.get('percent', 0)
+                            percentage = percentage or 0.0
                         break
-            
+
             ws.cell(row=row_num, column=col, value=count).border = border
             ws.cell(row=row_num, column=col).alignment = Alignment(horizontal='right', vertical='center')
-            ws.cell(row=row_num, column=col + 1, value=round(percentage, 2)).border = border
+            ws.cell(row=row_num, column=col + 1, value=round(float(percentage), 2)).border = border
             ws.cell(row=row_num, column=col + 1).alignment = Alignment(horizontal='right', vertical='center')
             col += cols_per_segment
         row_num += 1
-    
+
     return row_num
 
 

@@ -111,7 +111,7 @@ def merge_completed_responses(survey, sessions, completed_session_ids):
             'questions': {}
         }
         
-        # Add all question responses
+        # Add all question responses (applying overrides if configured)
         for qr in data['question_responses']:
             sessions[session_id]['questions'][qr.question.id] = qr.answer
 
@@ -311,7 +311,6 @@ def collect_completed_responses_only(survey):
                 'submitted_at': qr.survey_response.submitted_at
             }
         
-        # Store answer for this question
         sessions[response_id]['questions'][qr.question.id] = qr.answer
     
     return sessions, response_metadata

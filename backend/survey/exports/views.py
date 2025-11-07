@@ -566,7 +566,7 @@ def preview_segmented_analytics(request, survey_id):
                 # Add type-specific preview
                 if segment_question_data.get('type') == 'choice':
                     # Show top 3 options
-                    options = segment_question_data.get('options', [])
+                    options = segment_question_data.get('results') or segment_question_data.get('options', [])
                     preview_segment['top_options'] = options[:3]
                 elif segment_question_data.get('type') == 'numeric':
                     stats = segment_question_data.get('statistics', {})
@@ -660,6 +660,9 @@ def export_filtered_analytics(request, survey_id):
                 'details': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get exclude_open_text option (default: False for backward compatibility)
+        exclude_open_text = filter_config.get('exclude_open_text', False)
+        
         # Support both old format (single filter) and new format (multiple filters)
         filters_list = filter_config.get('filters', [])
         if not filters_list:
@@ -674,44 +677,76 @@ def export_filtered_analytics(request, survey_id):
         
         if not filters_list:
             return Response({
-                'error': 'No filters provided. Use "filters" array with question_id and selected_options for each filter.'
+                'error': 'No filters provided. Use "filters" array with question_id and selected_options (for choice) or numeric_range (for numeric) for each filter.'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Import helper function for numeric parsing
+        from .segmentation_engine import _parse_numeric_value, _get_total_fte_from_form_fields
         
         # Validate all filters
         filter_questions = {}
         for i, filter_item in enumerate(filters_list):
             filter_question_id = filter_item.get('question_id')
             selected_options = filter_item.get('selected_options', [])
+            numeric_range = filter_item.get('numeric_range')  # [min, max] or None
             
             if not filter_question_id:
                 return Response({
                     'error': f'Filter {i+1}: question_id is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            if not selected_options or not isinstance(selected_options, list):
-                return Response({
-                    'error': f'Filter {i+1}: selected_options must be a non-empty array'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Verify question exists and is a choice question
+            # Verify question exists
             filter_question = Question.objects.filter(id=filter_question_id, survey=survey).first()
             if not filter_question:
                 return Response({
                     'error': f'Filter {i+1}: Question {filter_question_id} not found for this survey'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            if filter_question.primary_type != 'form' or filter_question.secondary_type not in ['radio', 'dropdown', 'multiple_choices']:
+            # Determine filter type: choice or numeric_range
+            if numeric_range is not None:
+                # Numeric range filter
+                if not isinstance(numeric_range, list) or len(numeric_range) != 2:
+                    return Response({
+                        'error': f'Filter {i+1}: numeric_range must be [min, max] array (use null for unbounded)'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Validate question is numeric
+                is_numeric = (
+                    (filter_question.primary_type == 'open_text' and 
+                     filter_question.secondary_type in ['number', 'positive_number', 'negative_number']) or
+                    (filter_question.primary_type == 'form' and 
+                     filter_question.secondary_type == 'form_fields')
+                )
+                
+                if not is_numeric:
+                    return Response({
+                        'error': f'Filter {i+1}: numeric_range filtering is only available for numeric questions'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                filter_questions[filter_question_id] = {
+                    'question': filter_question,
+                    'type': 'numeric_range',
+                    'numeric_range': numeric_range
+                }
+            elif selected_options and isinstance(selected_options, list):
+                # Choice filter
+                if filter_question.primary_type != 'form' or filter_question.secondary_type not in ['radio', 'dropdown', 'multiple_choices']:
+                    return Response({
+                        'error': f'Filter {i+1}: Filtering is only available for choice questions (radio, dropdown, multiple_choices)'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                filter_questions[filter_question_id] = {
+                    'question': filter_question,
+                    'type': 'choice',
+                    'selected_options': selected_options
+                }
+            else:
                 return Response({
-                    'error': f'Filter {i+1}: Filtering is only available for choice questions (radio, dropdown, multiple_choices)'
+                    'error': f'Filter {i+1}: Must provide either selected_options (for choice) or numeric_range (for numeric)'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
-            filter_questions[filter_question_id] = {
-                'question': filter_question,
-                'selected_options': selected_options
-            }
         
         # Filter sessions - responses must match ALL filters (AND logic)
-        # Within each filter, responses matching ANY option are included (OR logic)
+        # Within each filter, responses matching ANY option are included (OR logic for choice)
         filtered_sessions = {}
         for session_id, session_data in sessions.items():
             answers = session_data.get('questions', {})
@@ -719,20 +754,46 @@ def export_filtered_analytics(request, survey_id):
             
             for filter_question_id, filter_info in filter_questions.items():
                 answer = answers.get(filter_question_id)
+                filter_type = filter_info.get('type')
                 
-                # Extract answer values
-                answer_values = []
-                if isinstance(answer, dict) and 'answer' in answer:
-                    answer = answer.get('answer')
-                
-                if isinstance(answer, list):
-                    answer_values = [str(x) for x in answer]
-                elif answer is not None:
-                    answer_values = [str(answer)]
-                
-                # Check if ANY answer value matches ANY selected option (OR logic for this filter)
-                selected_options_str = [str(opt) for opt in filter_info['selected_options']]
-                matches_this_filter = any(str(answer_val) in selected_options_str for answer_val in answer_values)
+                if filter_type == 'choice':
+                    # Choice filter: check if ANY answer value matches ANY selected option
+                    answer_values = []
+                    if isinstance(answer, dict) and 'answer' in answer:
+                        answer = answer.get('answer')
+                    
+                    if isinstance(answer, list):
+                        answer_values = [str(x) for x in answer]
+                    elif answer is not None:
+                        answer_values = [str(answer)]
+                    
+                    selected_options_str = [str(opt) for opt in filter_info['selected_options']]
+                    matches_this_filter = any(str(answer_val) in selected_options_str for answer_val in answer_values)
+                    
+                elif filter_type == 'numeric_range':
+                    # Numeric range filter: check if value falls within range
+                    question = filter_info['question']
+                    range_min, range_max = filter_info['numeric_range']
+                    
+                    # Parse numeric value
+                    numeric_value = None
+                    if question.primary_type == 'form' and question.secondary_type == 'form_fields':
+                        numeric_value = _get_total_fte_from_form_fields(answer)
+                    else:
+                        # Single numeric value
+                        if isinstance(answer, dict) and 'answer' in answer:
+                            answer = answer.get('answer')
+                        numeric_value = _parse_numeric_value(answer)
+                    
+                    if numeric_value is None:
+                        matches_this_filter = False
+                    else:
+                        # Check if value is within range
+                        matches_min = range_min is None or numeric_value >= float(range_min)
+                        matches_max = range_max is None or numeric_value <= float(range_max)
+                        matches_this_filter = matches_min and matches_max
+                else:
+                    matches_this_filter = False
                 
                 if not matches_this_filter:
                     matches_all_filters = False
@@ -768,12 +829,20 @@ def export_filtered_analytics(request, survey_id):
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             return response
         
+        # Filter questions if exclude_open_text is True
+        questions_to_include = all_questions
+        if exclude_open_text:
+            questions_to_include = [
+                q for q in all_questions
+                if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
+            ]
+        
         # Calculate analytics for filtered sessions
         filtered_response_count = len(filtered_sessions)
-        analytics = calculate_analytics(filtered_sessions, all_questions, filtered_response_count, response_metadata)
+        analytics = calculate_analytics(filtered_sessions, questions_to_include, filtered_response_count, response_metadata)
         
         # Create Excel workbook
-        wb = create_analytics_excel(analytics, all_questions, survey.title)
+        wb = create_analytics_excel(analytics, questions_to_include, survey.title)
         
         # Generate and return Excel file
         output = io.BytesIO()
@@ -789,15 +858,29 @@ def export_filtered_analytics(request, survey_id):
         # Build filename from filters
         filter_strs = []
         for filter_question_id, filter_info in filter_questions.items():
-            opts = filter_info['selected_options']
-            filter_str = '_'.join(opts[:2]).replace(' ', '_')
-            if len(opts) > 2:
-                filter_str += f"_+{len(opts)-2}more"
-            filter_strs.append(filter_str)
-        filter_str = '_'.join(filter_strs[:3])
-        if len(filter_strs) > 3:
-            filter_str += f"_+{len(filter_strs)-3}more_filters"
-        filename = f"{survey_name}_Filtered_{filter_str}_{current_datetime}.xlsx"
+            filter_type = filter_info.get('type', 'choice')
+            if filter_type == 'numeric_range':
+                range_min, range_max = filter_info.get('numeric_range', [None, None])
+                range_label = f"{range_min if range_min is not None else 'min'}-" \
+                              f"{range_max if range_max is not None else 'max'}"
+                filter_strs.append(range_label.replace(' ', '_'))
+            else:
+                opts = filter_info.get('selected_options', [])
+                if opts:
+                    filter_str = '_'.join(opts[:2]).replace(' ', '_')
+                    if len(opts) > 2:
+                        filter_str += f"_+{len(opts)-2}more"
+                else:
+                    filter_str = f"Q{filter_question_id}_choice"
+                filter_strs.append(filter_str)
+
+        if filter_strs:
+            filter_str = '_'.join(filter_strs[:3])
+            if len(filter_strs) > 3:
+                filter_str += f"_+{len(filter_strs)-3}more_filters"
+            filename = f"{survey_name}_Filtered_{filter_str}_{current_datetime}.xlsx"
+        else:
+            filename = f"{survey_name}_Filtered_{current_datetime}.xlsx"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         return response
@@ -883,6 +966,9 @@ def preview_filtered_analytics(request, survey_id):
                 'details': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get exclude_open_text option (default: False for backward compatibility)
+        exclude_open_text = filter_config.get('exclude_open_text', False)
+        
         # Support both old format (single filter) and new format (multiple filters)
         filters_list = filter_config.get('filters', [])
         if not filters_list:
@@ -904,32 +990,69 @@ def preview_filtered_analytics(request, survey_id):
                 'message': 'No filter configured yet'
             }, status=status.HTTP_200_OK)
         
+        # Import helper function for numeric parsing
+        from .segmentation_engine import _parse_numeric_value, _get_total_fte_from_form_fields
+        
         # Validate all filters
         filter_questions = {}
         filter_info_list = []
         for i, filter_item in enumerate(filters_list):
             filter_question_id = filter_item.get('question_id')
             selected_options = filter_item.get('selected_options', [])
+            numeric_range = filter_item.get('numeric_range')
             
-            if not filter_question_id or not selected_options:
+            if not filter_question_id:
                 continue  # Skip invalid filters
             
-            # Verify question exists and is a choice question
+            # Verify question exists
             filter_question = Question.objects.filter(id=filter_question_id, survey=survey).first()
             if not filter_question:
                 continue  # Skip invalid questions
             
-            if filter_question.primary_type != 'form' or filter_question.secondary_type not in ['radio', 'dropdown', 'multiple_choices']:
-                continue  # Skip non-choice questions
-            
-            filter_questions[filter_question_id] = {
-                'question': filter_question,
-                'selected_options': selected_options
-            }
-            filter_info_list.append({
-                'filter_question': f"Q{filter_question.order + 1}: {filter_question.question_text[:100]}",
-                'selected_options': selected_options
-            })
+            # Determine filter type
+            if numeric_range is not None:
+                # Numeric range filter
+                if not isinstance(numeric_range, list) or len(numeric_range) != 2:
+                    continue  # Skip invalid numeric range
+                
+                # Validate question is numeric
+                is_numeric = (
+                    (filter_question.primary_type == 'open_text' and 
+                     filter_question.secondary_type in ['number', 'positive_number', 'negative_number']) or
+                    (filter_question.primary_type == 'form' and 
+                     filter_question.secondary_type == 'form_fields')
+                )
+                
+                if not is_numeric:
+                    continue  # Skip non-numeric questions
+                
+                filter_questions[filter_question_id] = {
+                    'question': filter_question,
+                    'type': 'numeric_range',
+                    'numeric_range': numeric_range
+                }
+                range_min, range_max = numeric_range
+                range_desc = f"[{range_min if range_min is not None else 'min'}, {range_max if range_max is not None else 'max'}]"
+                filter_info_list.append({
+                    'filter_question': f"Q{filter_question.order + 1}: {filter_question.question_text[:100]}",
+                    'numeric_range': range_desc
+                })
+            elif selected_options and isinstance(selected_options, list):
+                # Choice filter
+                if filter_question.primary_type != 'form' or filter_question.secondary_type not in ['radio', 'dropdown', 'multiple_choices']:
+                    continue  # Skip non-choice questions
+                
+                filter_questions[filter_question_id] = {
+                    'question': filter_question,
+                    'type': 'choice',
+                    'selected_options': selected_options
+                }
+                filter_info_list.append({
+                    'filter_question': f"Q{filter_question.order + 1}: {filter_question.question_text[:100]}",
+                    'selected_options': selected_options
+                })
+            else:
+                continue  # Skip invalid filters
         
         if not filter_questions:
             return Response({
@@ -941,7 +1064,7 @@ def preview_filtered_analytics(request, survey_id):
             }, status=status.HTTP_200_OK)
         
         # Filter sessions - responses must match ALL filters (AND logic)
-        # Within each filter, responses matching ANY option are included (OR logic)
+        # Within each filter, responses matching ANY option are included (OR logic for choice)
         filtered_sessions = {}
         for session_id, session_data in sessions.items():
             answers = session_data.get('questions', {})
@@ -949,20 +1072,46 @@ def preview_filtered_analytics(request, survey_id):
             
             for filter_question_id, filter_info in filter_questions.items():
                 answer = answers.get(filter_question_id)
+                filter_type = filter_info.get('type')
                 
-                # Extract answer values
-                answer_values = []
-                if isinstance(answer, dict) and 'answer' in answer:
-                    answer = answer.get('answer')
-                
-                if isinstance(answer, list):
-                    answer_values = [str(x) for x in answer]
-                elif answer is not None:
-                    answer_values = [str(answer)]
-                
-                # Check if ANY answer value matches ANY selected option (OR logic for this filter)
-                selected_options_str = [str(opt) for opt in filter_info['selected_options']]
-                matches_this_filter = any(str(answer_val) in selected_options_str for answer_val in answer_values)
+                if filter_type == 'choice':
+                    # Choice filter: check if ANY answer value matches ANY selected option
+                    answer_values = []
+                    if isinstance(answer, dict) and 'answer' in answer:
+                        answer = answer.get('answer')
+                    
+                    if isinstance(answer, list):
+                        answer_values = [str(x) for x in answer]
+                    elif answer is not None:
+                        answer_values = [str(answer)]
+                    
+                    selected_options_str = [str(opt) for opt in filter_info['selected_options']]
+                    matches_this_filter = any(str(answer_val) in selected_options_str for answer_val in answer_values)
+                    
+                elif filter_type == 'numeric_range':
+                    # Numeric range filter: check if value falls within range
+                    question = filter_info['question']
+                    range_min, range_max = filter_info['numeric_range']
+                    
+                    # Parse numeric value
+                    numeric_value = None
+                    if question.primary_type == 'form' and question.secondary_type == 'form_fields':
+                        numeric_value = _get_total_fte_from_form_fields(answer)
+                    else:
+                        # Single numeric value
+                        if isinstance(answer, dict) and 'answer' in answer:
+                            answer = answer.get('answer')
+                        numeric_value = _parse_numeric_value(answer)
+                    
+                    if numeric_value is None:
+                        matches_this_filter = False
+                    else:
+                        # Check if value is within range
+                        matches_min = range_min is None or numeric_value >= float(range_min)
+                        matches_max = range_max is None or numeric_value <= float(range_max)
+                        matches_this_filter = matches_min and matches_max
+                else:
+                    matches_this_filter = False
                 
                 if not matches_this_filter:
                     matches_all_filters = False
@@ -977,8 +1126,11 @@ def preview_filtered_analytics(request, survey_id):
         if not filtered_sessions:
             filter_descriptions = []
             for filter_info in filter_info_list:
-                opts = filter_info['selected_options']
-                filter_descriptions.append(f"{filter_info['filter_question']} ({', '.join(opts[:3])}{'...' if len(opts) > 3 else ''})")
+                if 'selected_options' in filter_info:
+                    opts = filter_info['selected_options']
+                    filter_descriptions.append(f"{filter_info['filter_question']} ({', '.join(opts[:3])}{'...' if len(opts) > 3 else ''})")
+                elif 'numeric_range' in filter_info:
+                    filter_descriptions.append(f"{filter_info['filter_question']} {filter_info['numeric_range']}")
             
             filter_desc_str = ' AND '.join(filter_descriptions)
             return Response({
@@ -989,12 +1141,20 @@ def preview_filtered_analytics(request, survey_id):
                 'message': f'No responses match all filters: {filter_desc_str}'
             }, status=status.HTTP_200_OK)
         
+        # Filter questions if exclude_open_text is True
+        questions_to_include = all_questions
+        if exclude_open_text:
+            questions_to_include = [
+                q for q in all_questions
+                if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
+            ]
+        
         # Calculate analytics for filtered sessions
-        analytics = calculate_analytics(filtered_sessions, all_questions, filtered_count, response_metadata)
+        analytics = calculate_analytics(filtered_sessions, questions_to_include, filtered_count, response_metadata)
         
         # Build preview data - simplified version for UI display
         preview_data = []
-        for question in all_questions[:10]:  # Limit to first 10 questions for preview
+        for question in questions_to_include[:10]:  # Limit to first 10 questions for preview
             question_id = question.id
             question_data = analytics.get(question_id, {})
             
@@ -1014,7 +1174,7 @@ def preview_filtered_analytics(request, survey_id):
             # Add type-specific preview
             if question_data.get('type') == 'choice':
                 # Show top 3 options
-                options = question_data.get('options', [])
+                options = question_data.get('results') or question_data.get('options', [])
                 question_preview['top_options'] = options[:3]
             elif question_data.get('type') == 'numeric':
                 stats = question_data.get('statistics', {})
@@ -1032,8 +1192,9 @@ def preview_filtered_analytics(request, survey_id):
             'total_count': total_count,
             'filters': filter_info_list,
             'preview_data': preview_data,
-            'total_questions': len(all_questions),
-            'showing_questions': len(preview_data)
+            'total_questions': len(questions_to_include),
+            'showing_questions': len(preview_data),
+            'exclude_open_text': exclude_open_text
         }, status=status.HTTP_200_OK)
         
     except Exception as e:

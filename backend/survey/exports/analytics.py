@@ -9,6 +9,45 @@ from collections import defaultdict
 from typing import Dict, List, Any, Optional, Union
 
 
+def _is_blank_value(value) -> bool:
+    """Return True if the provided value should be treated as blank/empty."""
+    if value is None:
+        return True
+
+    if isinstance(value, str):
+        return value.strip() == ''
+
+    if isinstance(value, (int, float)):
+        return False
+
+    if isinstance(value, list):
+        return all(_is_blank_value(item) for item in value)
+
+    if isinstance(value, dict):
+        filtered_items = []
+        for key, item in value.items():
+            # Ignore comment-only keys when determining blankness
+            if key in {'comment', 'comments'}:
+                continue
+            filtered_items.append(item)
+
+        if not filtered_items:
+            return True
+
+        return all(_is_blank_value(item) for item in filtered_items)
+
+    return False
+
+
+def _is_effectively_blank_answer(answer) -> bool:
+    """Determine whether an answer should count as skipped for analytics."""
+    if isinstance(answer, dict) and 'answer' in answer:
+        base_value = answer.get('answer')
+        return _is_blank_value(base_value)
+
+    return _is_blank_value(answer)
+
+
 def calculate_analytics(sessions: Dict[str, Dict], questions: List, total_completed_responses: int, response_metadata: Dict) -> Dict[int, Dict[str, Any]]:
     """
     Calculate analytics for all questions based on session data.
@@ -33,13 +72,7 @@ def calculate_analytics(sessions: Dict[str, Dict], questions: List, total_comple
         answered_count = 0
         for session_id, session_data in sessions.items():
             answer = session_data.get('questions', {}).get(question.id)
-            if answer is not None:
-                # Check if answer is empty (empty string, empty dict, empty list, None)
-                if answer == '' or answer == {} or answer == []:
-                    continue
-                # For dict answers, check if it's not just empty structure
-                if isinstance(answer, dict) and not any(answer.values()):
-                    continue
+            if not _is_effectively_blank_answer(answer):
                 answered_count += 1
         
         skipped_count = total_completed_responses - answered_count
@@ -165,25 +198,58 @@ def calculate_choice_analytics(question, sessions: Dict, answered_count: int, sk
     """
     option_counts = defaultdict(int)
     total_responses = 0
-    
-    # Get all possible options
-    all_options = question.options.copy() if question.options else []
+
+    def _extract_option_label(raw_option) -> str:
+        if raw_option is None:
+            return ''
+        if isinstance(raw_option, dict):
+            for key in ('label', 'name', 'value', 'text', 'option'):
+                if raw_option.get(key):
+                    return str(raw_option[key])
+            return str(raw_option)
+        return str(raw_option)
+
+    def _normalize(label: str) -> str:
+        return ' '.join(label.strip().lower().split())
+
+    # Get all possible options preserving question order
+    ordered_options: List[str] = []
+    option_lookup: Dict[str, str] = {}
+
+    if question.options:
+        for raw_option in question.options:
+            label = _extract_option_label(raw_option)
+            if label:
+                normalized = _normalize(label)
+                if normalized not in option_lookup:
+                    ordered_options.append(label)
+                    option_lookup[normalized] = label
+
+    # Add special options if they exist
     if question.has_other_option:
-        all_options.append('Other')
+        label = 'Other'
+        normalized = _normalize(label)
+        if normalized not in option_lookup:
+            ordered_options.append(label)
+            option_lookup[normalized] = label
+
     if question.has_none_option:
-        none_text = question.none_option_text or 'None of the above'
-        all_options.append(none_text)
-    
+        label = question.none_option_text or 'None of the above'
+        normalized = _normalize(label)
+        if normalized not in option_lookup:
+            ordered_options.append(label)
+            option_lookup[normalized] = label
+ 
     # Count responses
     for session_id, session_data in sessions.items():
         answer = session_data.get('questions', {}).get(question.id)
-
+ 
         if answer is None:
             continue
-
+ 
         # Extract selected options
         selected_options = []
-
+ 
         if isinstance(answer, list):
             selected_options = answer
         elif isinstance(answer, dict):
@@ -195,13 +261,13 @@ def calculate_choice_analytics(question, sessions: Dict, answered_count: int, sk
                     selected_options = [inner_answer]
         elif answer:
             selected_options = [answer]
-
+ 
         # Skip if no selections were made (do not include in base)
         if not selected_options or (isinstance(selected_options, list) and len(selected_options) == 0):
             continue
-
+ 
         total_responses += 1
-
+ 
         # Count each selected option
         for selected in selected_options:
             # Handle "Other: custom text" format
@@ -210,13 +276,24 @@ def calculate_choice_analytics(question, sessions: Dict, answered_count: int, sk
             elif isinstance(selected, dict) and 'other' in selected:
                 option_counts['Other'] += 1
             else:
-                option_name = str(selected)
-                if option_name in all_options:
-                    option_counts[option_name] += 1
-    
+                option_label = _extract_option_label(selected)
+                normalized = _normalize(option_label)
+
+                if normalized in option_lookup:
+                    canonical_label = option_lookup[normalized]
+                else:
+                    # New option encountered (e.g. legacy data). Preserve label order of appearance.
+                    canonical_label = option_label
+                    if canonical_label:
+                        option_lookup[normalized] = canonical_label
+                        ordered_options.append(canonical_label)
+
+                if canonical_label:
+                    option_counts[canonical_label] += 1
+ 
     # Calculate percentages
     results = []
-    for option in all_options:
+    for option in ordered_options:
         count = option_counts.get(option, 0)
         percentage = (count / total_responses * 100) if total_responses > 0 else 0
         results.append({
@@ -460,7 +537,6 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
         if answer is None:
             continue
 
-        # Extract answer from dict if needed
         if isinstance(answer, dict) and 'answer' in answer:
             answer = answer.get('answer')
 
@@ -469,39 +545,33 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
 
         # Parse numeric values for this respondent
         parsed_map: Dict[str, float] = {}
-        any_numeric_present = False
         for subfield_name in numeric_subfields:
             raw_val = answer.get(subfield_name)
             parsed = _parse_numeric_value(raw_val)
             if parsed is not None:
                 parsed_map[subfield_name] = float(parsed)
-                any_numeric_present = True
 
         # Exclude respondents with ALL blanks across numeric subfields
-        if not any_numeric_present:
+        if not parsed_map:
             continue
-
-        # For missing subfields, treat as zero to keep consistent base
-        for subfield_name in numeric_subfields:
-            if subfield_name not in parsed_map:
-                parsed_map[subfield_name] = 0.0
 
         respondent_values.append(parsed_map)
 
     base_count = len(respondent_values)
 
-    # Build values per subfield with zero-filled base
+    # Build values per subfield
     subfield_values: Dict[str, List[float]] = {sf: [] for sf in numeric_subfields}
     for rv in respondent_values:
-        for sf in numeric_subfields:
-            subfield_values[sf].append(rv.get(sf, 0.0))
+        for sf, val in rv.items():
+            if sf in subfield_values:
+                subfield_values[sf].append(val)
 
-    # Calculate analytics for each subfield using the same base
+    # Calculate analytics for each subfield using collected values
     subfield_analytics: Dict[str, Any] = {}
     for subfield_name in numeric_subfields:
         values = subfield_values[subfield_name]
 
-        if base_count == 0:
+        if not values:
             subfield_analytics[subfield_name] = {
                 'count': 0,
                 'min': 'N/A',
@@ -513,31 +583,25 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
                 'sum': 'N/A',
             }
         else:
-            count = base_count
-            # Quartiles with zeros included (require at least 2 data points)
+            count = len(values)
             if len(values) >= 2:
-                q1 = statistics.quantiles(values, n=4)[0]
-                median = statistics.median(values)
-                q3 = statistics.quantiles(values, n=4)[2]
-            elif len(values) == 1:
-                # Single value: use it for all quartiles
-                q1 = values[0]
-                median = values[0]
-                q3 = values[0]
+                quartiles = statistics.quantiles(values, n=4)
+                q1 = quartiles[0]
+                q3 = quartiles[2]
             else:
-                # No values
-                q1 = 0
-                median = 0
-                q3 = 0
+                q1 = values[0]
+                q3 = values[0]
+
+            median = statistics.median(values)
 
             subfield_analytics[subfield_name] = {
                 'count': count,
-                'min': min(values) if values else 0,
+                'min': min(values),
                 'q1': round(q1, 2),
                 'median': round(median, 2),
                 'q3': round(q3, 2),
-                'max': max(values) if values else 0,
-                'average': round(statistics.mean(values), 2) if values else 0,
+                'max': max(values),
+                'average': round(statistics.mean(values), 2),
                 'sum': round(sum(values), 2),
             }
 
