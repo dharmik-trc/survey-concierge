@@ -14,7 +14,8 @@ def create_segmented_analytics_excel(
     segment_analytics: Dict[str, Dict],
     questions: List,
     survey_title: str,
-    segment_order: List[str]
+    segment_order: List[str],
+    all_questions: List = None
 ) -> openpyxl.Workbook:
     """
     Create Excel workbook with segmented analytics.
@@ -24,9 +25,10 @@ def create_segmented_analytics_excel(
     
     Args:
         segment_analytics: Dict mapping segment_name -> analytics dict (same format as regular analytics)
-        questions: List of Question objects (ordered)
+        questions: List of Question objects (ordered) - may be filtered
         survey_title: Title of the survey
         segment_order: Ordered list of segment names (first should be "All responses")
+        all_questions: Optional full list of all questions (ordered) - used for correct numbering
     
     Returns:
         openpyxl.Workbook object
@@ -59,8 +61,14 @@ def create_segmented_analytics_excel(
     # Cache questions for quick lookup (preserves original ordering)
     question_map = {question.id: question for question in questions}
     
+    # Create mapping from question_id to position in all_questions list (for correct numbering)
+    # Use all_questions if provided, otherwise use questions (assumes questions is the full list)
+    questions_for_numbering = all_questions if all_questions is not None else questions
+    question_number_map = {}
+    for idx, q in enumerate(questions_for_numbering, start=1):
+        question_number_map[q.id] = idx
+    
     row_num = 1
-    question_num = 0
     
     for question in questions:
         question_id = question.id
@@ -74,7 +82,9 @@ def create_segmented_analytics_excel(
         if not has_analytics:
             continue
         
-        question_num += 1
+        # Use position in original all_questions list to match data export numbering
+        # This maintains original question numbers even when some questions don't have analytics
+        question_num = question_number_map.get(question_id, (question.order or 0) + 1)
         
         # Question header spanning all columns
         start_col = 1

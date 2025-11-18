@@ -399,8 +399,8 @@ def export_segmented_analytics(request, survey_id):
             seg for seg in segment_to_session_ids.keys() if seg != 'All responses'
         ]
         
-        # Create Excel workbook with segmented analytics
-        wb = create_segmented_analytics_excel(segment_analytics, all_questions, survey.title, segment_order)
+        # Create Excel workbook with segmented analytics - pass all_questions for correct numbering
+        wb = create_segmented_analytics_excel(segment_analytics, all_questions, survey.title, segment_order, all_questions=all_questions)
         
         # Generate and return Excel file
         output = io.BytesIO()
@@ -653,7 +653,10 @@ def export_filtered_analytics(request, survey_id):
         
         # Parse filter config from request body
         try:
-            filter_config = json.loads(request.body.decode('utf-8') or '{}')
+            request_body_str = request.body.decode('utf-8') or '{}'
+            filter_config = json.loads(request_body_str)
+            print(f"DEBUG export_filtered_analytics: Request body (first 300 chars): {request_body_str[:300]}")
+            print(f"DEBUG export_filtered_analytics: filter_config keys: {list(filter_config.keys())}")
         except Exception as e:
             return Response({
                 'error': 'Invalid JSON in request body',
@@ -662,6 +665,12 @@ def export_filtered_analytics(request, survey_id):
         
         # Get exclude_open_text option (default: False for backward compatibility)
         exclude_open_text = filter_config.get('exclude_open_text', False)
+        print(f"DEBUG export_filtered_analytics: exclude_open_text raw value: {exclude_open_text}, type: {type(exclude_open_text)}")
+        # Ensure it's a boolean (handle string "true"/"false" from frontend if needed)
+        if isinstance(exclude_open_text, str):
+            exclude_open_text = exclude_open_text.lower() in ('true', '1', 'yes')
+        exclude_open_text = bool(exclude_open_text)
+        print(f"DEBUG export_filtered_analytics: exclude_open_text after conversion: {exclude_open_text}")
         
         # Support both old format (single filter) and new format (multiple filters)
         filters_list = filter_config.get('filters', [])
@@ -772,26 +781,38 @@ def export_filtered_analytics(request, survey_id):
                     
                 elif filter_type == 'numeric_range':
                     # Numeric range filter: check if value falls within range
+                    from .analytics import _is_effectively_blank_answer, _is_blank_value
+                    
                     question = filter_info['question']
                     range_min, range_max = filter_info['numeric_range']
                     
-                    # Parse numeric value
-                    numeric_value = None
-                    if question.primary_type == 'form' and question.secondary_type == 'form_fields':
-                        numeric_value = _get_total_fte_from_form_fields(answer)
-                    else:
-                        # Single numeric value
-                        if isinstance(answer, dict) and 'answer' in answer:
-                            answer = answer.get('answer')
-                        numeric_value = _parse_numeric_value(answer)
-                    
-                    if numeric_value is None:
+                    # Skip blank answers entirely - they don't match any range
+                    if _is_effectively_blank_answer(answer):
                         matches_this_filter = False
                     else:
-                        # Check if value is within range
-                        matches_min = range_min is None or numeric_value >= float(range_min)
-                        matches_max = range_max is None or numeric_value <= float(range_max)
-                        matches_this_filter = matches_min and matches_max
+                        # Parse numeric value
+                        numeric_value = None
+                        if question.primary_type == 'form' and question.secondary_type == 'form_fields':
+                            numeric_value = _get_total_fte_from_form_fields(answer)
+                        else:
+                            # Single numeric value
+                            if isinstance(answer, dict) and 'answer' in answer:
+                                inner_answer = answer.get('answer')
+                                # Skip if inner answer is blank
+                                if _is_blank_value(inner_answer):
+                                    numeric_value = None
+                                else:
+                                    numeric_value = _parse_numeric_value(inner_answer)
+                            else:
+                                numeric_value = _parse_numeric_value(answer)
+                        
+                        if numeric_value is None:
+                            matches_this_filter = False
+                        else:
+                            # Check if value is within range
+                            matches_min = range_min is None or numeric_value >= float(range_min)
+                            matches_max = range_max is None or numeric_value <= float(range_max)
+                            matches_this_filter = matches_min and matches_max
                 else:
                     matches_this_filter = False
                 
@@ -807,8 +828,17 @@ def export_filtered_analytics(request, survey_id):
             filter_descriptions = []
             for filter_question_id, filter_info in filter_questions.items():
                 q = filter_info['question']
-                opts = filter_info['selected_options']
-                filter_descriptions.append(f"Q{q.order + 1} ({', '.join(opts[:3])}{'...' if len(opts) > 3 else ''})")
+                filter_type = filter_info.get('type', 'choice')
+                if filter_type == 'numeric_range':
+                    range_min, range_max = filter_info.get('numeric_range', [None, None])
+                    range_desc = f"[{range_min if range_min is not None else 'min'}, {range_max if range_max is not None else 'max'}]"
+                    filter_descriptions.append(f"Q{q.order + 1} {range_desc}")
+                else:
+                    opts = filter_info.get('selected_options', [])
+                    if opts:
+                        filter_descriptions.append(f"Q{q.order + 1} ({', '.join(opts[:3])}{'...' if len(opts) > 3 else ''})")
+                    else:
+                        filter_descriptions.append(f"Q{q.order + 1} (invalid filter)")
             
             wb = openpyxl.Workbook()
             ws = wb.active
@@ -831,18 +861,37 @@ def export_filtered_analytics(request, survey_id):
         
         # Filter questions if exclude_open_text is True
         questions_to_include = all_questions
+        open_text_excluded_count = 0
+        print(f"DEBUG Export: Before filtering - exclude_open_text={exclude_open_text}, total questions: {len(all_questions)}")
         if exclude_open_text:
+            original_count = len(all_questions)
+            # Count open text questions before filtering
+            open_text_questions = [
+                q for q in all_questions
+                if q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph']
+            ]
+            open_text_excluded_count = len(open_text_questions)
+            print(f"DEBUG Export: Found {open_text_excluded_count} open text questions to exclude")
             questions_to_include = [
                 q for q in all_questions
                 if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
             ]
+            filtered_questions_count = len(questions_to_include)
+            excluded_count = original_count - filtered_questions_count
+            print(f"Export: exclude_open_text={exclude_open_text}, Excluding {open_text_excluded_count} open text questions: {original_count} -> {filtered_questions_count} questions")
+            # List excluded questions for debugging
+            if open_text_questions:
+                print(f"  Excluded question IDs: {[q.id for q in open_text_questions]}")
+                print(f"  Excluded question text (first 3): {[q.question_text[:50] for q in open_text_questions[:3]]}")
+        else:
+            print(f"DEBUG Export: exclude_open_text is False, NOT excluding open text questions")
         
         # Calculate analytics for filtered sessions
         filtered_response_count = len(filtered_sessions)
         analytics = calculate_analytics(filtered_sessions, questions_to_include, filtered_response_count, response_metadata)
         
-        # Create Excel workbook
-        wb = create_analytics_excel(analytics, questions_to_include, survey.title)
+        # Create Excel workbook - pass all_questions for correct numbering
+        wb = create_analytics_excel(analytics, questions_to_include, survey.title, all_questions=all_questions)
         
         # Generate and return Excel file
         output = io.BytesIO()
@@ -968,6 +1017,10 @@ def preview_filtered_analytics(request, survey_id):
         
         # Get exclude_open_text option (default: False for backward compatibility)
         exclude_open_text = filter_config.get('exclude_open_text', False)
+        # Ensure it's a boolean (handle string "true"/"false" from frontend if needed)
+        if isinstance(exclude_open_text, str):
+            exclude_open_text = exclude_open_text.lower() in ('true', '1', 'yes')
+        exclude_open_text = bool(exclude_open_text)
         
         # Support both old format (single filter) and new format (multiple filters)
         filters_list = filter_config.get('filters', [])
@@ -1090,26 +1143,38 @@ def preview_filtered_analytics(request, survey_id):
                     
                 elif filter_type == 'numeric_range':
                     # Numeric range filter: check if value falls within range
+                    from .analytics import _is_effectively_blank_answer, _is_blank_value
+                    
                     question = filter_info['question']
                     range_min, range_max = filter_info['numeric_range']
                     
-                    # Parse numeric value
-                    numeric_value = None
-                    if question.primary_type == 'form' and question.secondary_type == 'form_fields':
-                        numeric_value = _get_total_fte_from_form_fields(answer)
-                    else:
-                        # Single numeric value
-                        if isinstance(answer, dict) and 'answer' in answer:
-                            answer = answer.get('answer')
-                        numeric_value = _parse_numeric_value(answer)
-                    
-                    if numeric_value is None:
+                    # Skip blank answers entirely - they don't match any range
+                    if _is_effectively_blank_answer(answer):
                         matches_this_filter = False
                     else:
-                        # Check if value is within range
-                        matches_min = range_min is None or numeric_value >= float(range_min)
-                        matches_max = range_max is None or numeric_value <= float(range_max)
-                        matches_this_filter = matches_min and matches_max
+                        # Parse numeric value
+                        numeric_value = None
+                        if question.primary_type == 'form' and question.secondary_type == 'form_fields':
+                            numeric_value = _get_total_fte_from_form_fields(answer)
+                        else:
+                            # Single numeric value
+                            if isinstance(answer, dict) and 'answer' in answer:
+                                inner_answer = answer.get('answer')
+                                # Skip if inner answer is blank
+                                if _is_blank_value(inner_answer):
+                                    numeric_value = None
+                                else:
+                                    numeric_value = _parse_numeric_value(inner_answer)
+                            else:
+                                numeric_value = _parse_numeric_value(answer)
+                        
+                        if numeric_value is None:
+                            matches_this_filter = False
+                        else:
+                            # Check if value is within range
+                            matches_min = range_min is None or numeric_value >= float(range_min)
+                            matches_max = range_max is None or numeric_value <= float(range_max)
+                            matches_this_filter = matches_min and matches_max
                 else:
                     matches_this_filter = False
                 
@@ -1143,11 +1208,26 @@ def preview_filtered_analytics(request, survey_id):
         
         # Filter questions if exclude_open_text is True
         questions_to_include = all_questions
+        open_text_excluded_count = 0
         if exclude_open_text:
+            original_count = len(all_questions)
+            # Count open text questions that will be excluded
+            open_text_questions = [
+                q for q in all_questions
+                if q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph']
+            ]
+            open_text_excluded_count = len(open_text_questions)
             questions_to_include = [
                 q for q in all_questions
                 if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
             ]
+            filtered_count = len(questions_to_include)
+            print(f"Preview: exclude_open_text={exclude_open_text}, Excluding {open_text_excluded_count} open text questions: {original_count} -> {filtered_count} questions")
+            # List excluded questions for debugging
+            if open_text_questions:
+                print(f"  Excluded questions: {[(q.id, q.question_text[:50]) for q in open_text_questions[:5]]}")
+        else:
+            print(f"Preview: exclude_open_text={exclude_open_text}, NOT excluding open text questions")
         
         # Calculate analytics for filtered sessions
         analytics = calculate_analytics(filtered_sessions, questions_to_include, filtered_count, response_metadata)
@@ -1194,7 +1274,9 @@ def preview_filtered_analytics(request, survey_id):
             'preview_data': preview_data,
             'total_questions': len(questions_to_include),
             'showing_questions': len(preview_data),
-            'exclude_open_text': exclude_open_text
+            'exclude_open_text': exclude_open_text,
+            'open_text_excluded_count': open_text_excluded_count,
+            'total_questions_before_filter': len(all_questions) if exclude_open_text else len(questions_to_include)
         }, status=status.HTTP_200_OK)
         
     except Exception as e:

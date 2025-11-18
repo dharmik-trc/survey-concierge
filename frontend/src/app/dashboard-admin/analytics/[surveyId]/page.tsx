@@ -464,12 +464,17 @@ export default function AnalyticsPage() {
                           <strong>{filterPreviewData.total_questions}</strong>{" "}
                           questions with complete analytics
                           {filterPreviewData.exclude_open_text && (
-                            <span className="text-orange-700">
+                            <span className="text-orange-700 font-semibold">
                               {" "}
-                              (open text questions excluded)
+                              ({filterPreviewData.open_text_excluded_count || 0} open text question{filterPreviewData.open_text_excluded_count !== 1 ? 's' : ''} excluded)
                             </span>
                           )}
                         </li>
+                        {filterPreviewData.exclude_open_text && filterPreviewData.total_questions_before_filter && (
+                          <li className="text-xs text-gray-600 italic">
+                            (Total questions before filter: {filterPreviewData.total_questions_before_filter})
+                          </li>
+                        )}
                         <li>
                           Response counts, percentages, and statistics for each
                           question

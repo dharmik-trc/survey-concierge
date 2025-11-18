@@ -7,6 +7,7 @@ This module handles calculating analytics statistics from survey responses.
 import statistics
 from collections import defaultdict
 from typing import Dict, List, Any, Optional, Union
+import math
 
 
 def _is_blank_value(value) -> bool:
@@ -406,22 +407,72 @@ def calculate_grid_analytics(question, sessions: Dict, answered_count: int, skip
 
 
 def _parse_numeric_value(v):
-    """Parse a value to float if possible, return None otherwise."""
+    """Parse a value to float if possible, return None otherwise.
+    
+    Excludes blank/empty values - returns None for empty strings, None, etc.
+    """
+    if v is None:
+        return None
+    
     if isinstance(v, (int, float)):
+        # Allow 0 as a valid numeric value (distinguish from blanks)
         return float(v)
     elif isinstance(v, str):
+        # Skip blank strings
+        cleaned = v.strip()
+        if not cleaned or cleaned == '':
+            return None
+        
         # Try to parse as number (handle negative, decimals)
         try:
-            return float(v)
+            return float(cleaned)
         except:
             # Check if it's a numeric string (handles cases like "123", "45.6", "-10")
-            cleaned = v.strip().replace(',', '')  # Remove commas
-            if cleaned.replace('.', '').replace('-', '').isdigit():
+            cleaned_no_commas = cleaned.replace(',', '')  # Remove commas
+            if cleaned_no_commas and cleaned_no_commas.replace('.', '').replace('-', '').isdigit():
                 try:
-                    return float(cleaned)
+                    return float(cleaned_no_commas)
                 except:
                     pass
     return None
+
+
+def _calculate_excel_quartile(data: List[float], quartile: int) -> float:
+    """
+    Calculate quartile using Excel's QUARTILE/QUARTILE.INC function algorithm.
+    
+    Excel's QUARTILE/QUARTILE.INC uses method='inclusive' which matches
+    Python's statistics.quantiles with method='inclusive'.
+    
+    Formula: position = (n-1) * p + 1, where p is the percentile
+    - For Q1 (quartile=1): p = 0.25
+    - For Q2 (quartile=2): p = 0.50 (median)
+    - For Q3 (quartile=3): p = 0.75
+    
+    Args:
+        data: List of numeric values (will be sorted)
+        quartile: Quartile number (1, 2, or 3)
+    
+    Returns:
+        Quartile value matching Excel QUARTILE/QUARTILE.INC
+    """
+    if not data:
+        return 0.0
+    
+    if len(data) == 1:
+        return float(data[0])
+    
+    # Use Python's statistics.quantiles with method='inclusive' which matches Excel QUARTILE.INC
+    quartiles = statistics.quantiles(data, n=4, method='inclusive')
+    # quartiles[0] = Q1, quartiles[1] = Q2 (median), quartiles[2] = Q3
+    if quartile == 1:
+        return float(quartiles[0])
+    elif quartile == 2:
+        return float(statistics.median(data))
+    elif quartile == 3:
+        return float(quartiles[2])
+    else:
+        return 0.0
 
 
 def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, skipped_count: int) -> Dict[str, Any]:
@@ -430,6 +481,8 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
     
     Returns: min, Q1, median (Q2), Q3, max, average, sum, count
     Plus answered/skipped counts.
+    
+    Note: Excludes blank answers and zeros that come from blank fields.
     """
     numeric_values = []
     
@@ -437,7 +490,8 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
     for session_id, session_data in sessions.items():
         answer = session_data.get('questions', {}).get(question.id)
         
-        if answer is None:
+        # Skip blank answers entirely - don't try to parse them
+        if _is_effectively_blank_answer(answer):
             continue
         
         # Extract numeric value(s)
@@ -447,30 +501,46 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
             # Check for answer/comment structure
             if 'answer' in answer and 'comment' in answer:
                 inner_answer = answer.get('answer')
+                # Skip if inner answer is blank
+                if _is_blank_value(inner_answer):
+                    continue
+                    
                 if isinstance(inner_answer, dict):
                     # Form fields - extract all numeric values
                     for v in inner_answer.values():
+                        # Skip blank subfield values
+                        if _is_blank_value(v):
+                            continue
                         parsed = _parse_numeric_value(v)
-                        if parsed is not None:
+                        # Exclude zeros that come from blanks (if parsed as 0 but was blank, skip)
+                        if parsed is not None and parsed != 0:
                             values_found.append(parsed)
                 else:
                     # Single answer value
                     parsed = _parse_numeric_value(inner_answer)
-                    if parsed is not None:
+                    # Exclude zeros from blanks
+                    if parsed is not None and parsed != 0:
                         values_found.append(parsed)
             else:
-                # Regular dict - try all values
-                for v in answer.values():
+                # Regular dict - try all values (excluding comments)
+                for key, v in answer.items():
+                    if key in {'comment', 'comments'}:
+                        continue
+                    # Skip blank values
+                    if _is_blank_value(v):
+                        continue
                     parsed = _parse_numeric_value(v)
-                    if parsed is not None:
+                    # Exclude zeros from blanks
+                    if parsed is not None and parsed != 0:
                         values_found.append(parsed)
         else:
-            # Direct value
+            # Direct value - already checked for blank above
             parsed = _parse_numeric_value(answer)
-            if parsed is not None:
+            # Exclude zeros from blanks
+            if parsed is not None and parsed != 0:
                 values_found.append(parsed)
         
-        # Add all found numeric values
+        # Add all found numeric values (excluding zeros from blanks)
         numeric_values.extend(values_found)
     
     if not numeric_values:
@@ -487,11 +557,12 @@ def calculate_numeric_analytics(question, sessions: Dict, answered_count: int, s
     numeric_values_sorted = sorted(numeric_values)
     count = len(numeric_values)
     
-    # Quartiles (require at least 2 data points)
+    # Quartiles using Excel's QUARTILE function algorithm for exact matching
     if count >= 2:
-        q1 = statistics.quantiles(numeric_values, n=4)[0]
-        median = statistics.median(numeric_values)
-        q3 = statistics.quantiles(numeric_values, n=4)[2]
+        # Use Excel's exact quartile calculation method
+        q1 = _calculate_excel_quartile(numeric_values_sorted, 1)
+        median = statistics.median(numeric_values)  # Q2
+        q3 = _calculate_excel_quartile(numeric_values_sorted, 3)
     elif count == 1:
         # Single value: use it for all quartiles
         q1 = numeric_values[0]
@@ -545,19 +616,34 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
 
         # Parse numeric values for this respondent
         parsed_map: Dict[str, float] = {}
+        has_any_value = False
         for subfield_name in numeric_subfields:
             raw_val = answer.get(subfield_name)
+            # Skip blank subfield values entirely
+            if _is_blank_value(raw_val):
+                continue
+            
+            # If not blank, try to parse it
             parsed = _parse_numeric_value(raw_val)
             if parsed is not None:
+                # Include the value (including 0 if it was explicitly entered)
+                # We know it's not blank because we checked _is_blank_value above
                 parsed_map[subfield_name] = float(parsed)
+                has_any_value = True
 
         # Exclude respondents with ALL blanks across numeric subfields
-        if not parsed_map:
+        # (but include if they have at least one numeric value, even if it's 0)
+        if not has_any_value:
             continue
 
         respondent_values.append(parsed_map)
 
     base_count = len(respondent_values)
+    
+    # Debug logging for form_fields base_count calculation
+    if question.id == 32:  # Q32 specific logging
+        print(f"DEBUG Q32 base_count: question_id={question.id}, base_count={base_count}, initial_answered_count={answered_count}, total_sessions={len(sessions)}")
+        print(f"DEBUG Q32: respondent_values count={len(respondent_values)}")
 
     # Build values per subfield
     subfield_values: Dict[str, List[float]] = {sf: [] for sf in numeric_subfields}
@@ -585,9 +671,10 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
         else:
             count = len(values)
             if len(values) >= 2:
-                quartiles = statistics.quantiles(values, n=4)
-                q1 = quartiles[0]
-                q3 = quartiles[2]
+                # Use Excel's exact quartile calculation method for form fields too
+                sorted_values = sorted(values)
+                q1 = _calculate_excel_quartile(sorted_values, 1)
+                q3 = _calculate_excel_quartile(sorted_values, 3)
             else:
                 q1 = values[0]
                 q3 = values[0]
@@ -605,11 +692,17 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
                 'sum': round(sum(values), 2),
             }
 
+    # For form_fields numeric, answered_count should equal base_count
+    # (only respondents with at least one valid numeric value count as answered)
+    # Update skipped_count accordingly
+    actual_answered_count = base_count
+    actual_skipped_count = answered_count + skipped_count - base_count
+    
     return {
         'type': 'form_fields_numeric',
         'question_text': question.question_text,
-        'answered_count': answered_count,
-        'skipped_count': skipped_count,
+        'answered_count': actual_answered_count,
+        'skipped_count': actual_skipped_count,
         'base_count': base_count,
         'subfields': subfield_analytics
     }
