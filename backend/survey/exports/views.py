@@ -655,8 +655,6 @@ def export_filtered_analytics(request, survey_id):
         try:
             request_body_str = request.body.decode('utf-8') or '{}'
             filter_config = json.loads(request_body_str)
-            print(f"DEBUG export_filtered_analytics: Request body (first 300 chars): {request_body_str[:300]}")
-            print(f"DEBUG export_filtered_analytics: filter_config keys: {list(filter_config.keys())}")
         except Exception as e:
             return Response({
                 'error': 'Invalid JSON in request body',
@@ -665,12 +663,10 @@ def export_filtered_analytics(request, survey_id):
         
         # Get exclude_open_text option (default: False for backward compatibility)
         exclude_open_text = filter_config.get('exclude_open_text', False)
-        print(f"DEBUG export_filtered_analytics: exclude_open_text raw value: {exclude_open_text}, type: {type(exclude_open_text)}")
         # Ensure it's a boolean (handle string "true"/"false" from frontend if needed)
         if isinstance(exclude_open_text, str):
             exclude_open_text = exclude_open_text.lower() in ('true', '1', 'yes')
         exclude_open_text = bool(exclude_open_text)
-        print(f"DEBUG export_filtered_analytics: exclude_open_text after conversion: {exclude_open_text}")
         
         # Support both old format (single filter) and new format (multiple filters)
         filters_list = filter_config.get('filters', [])
@@ -862,7 +858,6 @@ def export_filtered_analytics(request, survey_id):
         # Filter questions if exclude_open_text is True
         questions_to_include = all_questions
         open_text_excluded_count = 0
-        print(f"DEBUG Export: Before filtering - exclude_open_text={exclude_open_text}, total questions: {len(all_questions)}")
         if exclude_open_text:
             original_count = len(all_questions)
             # Count open text questions before filtering
@@ -871,20 +866,12 @@ def export_filtered_analytics(request, survey_id):
                 if q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph']
             ]
             open_text_excluded_count = len(open_text_questions)
-            print(f"DEBUG Export: Found {open_text_excluded_count} open text questions to exclude")
             questions_to_include = [
                 q for q in all_questions
                 if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
             ]
-            filtered_questions_count = len(questions_to_include)
-            excluded_count = original_count - filtered_questions_count
-            print(f"Export: exclude_open_text={exclude_open_text}, Excluding {open_text_excluded_count} open text questions: {original_count} -> {filtered_questions_count} questions")
-            # List excluded questions for debugging
-            if open_text_questions:
-                print(f"  Excluded question IDs: {[q.id for q in open_text_questions]}")
-                print(f"  Excluded question text (first 3): {[q.question_text[:50] for q in open_text_questions[:3]]}")
         else:
-            print(f"DEBUG Export: exclude_open_text is False, NOT excluding open text questions")
+            pass
         
         # Calculate analytics for filtered sessions
         filtered_response_count = len(filtered_sessions)
@@ -1222,12 +1209,6 @@ def preview_filtered_analytics(request, survey_id):
                 if not (q.primary_type == 'open_text' and q.secondary_type in ['text', 'paragraph'])
             ]
             filtered_count = len(questions_to_include)
-            print(f"Preview: exclude_open_text={exclude_open_text}, Excluding {open_text_excluded_count} open text questions: {original_count} -> {filtered_count} questions")
-            # List excluded questions for debugging
-            if open_text_questions:
-                print(f"  Excluded questions: {[(q.id, q.question_text[:50]) for q in open_text_questions[:5]]}")
-        else:
-            print(f"Preview: exclude_open_text={exclude_open_text}, NOT excluding open text questions")
         
         # Calculate analytics for filtered sessions
         analytics = calculate_analytics(filtered_sessions, questions_to_include, filtered_count, response_metadata)

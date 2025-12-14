@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, use, useMemo } from "react";
+import { useState, useEffect, useRef, use, Fragment } from "react";
+import type { ReactNode, FormEvent } from "react";
 import {
   apiService,
   Survey as SurveyType,
@@ -10,7 +11,6 @@ import {
   DEFAULT_NONE_OPTION,
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
-import React from "react"; // Added missing import for React
 import SearchableDropdown from "../../../components/SearchableDropdown";
 
 interface SurveyResponse {
@@ -48,8 +48,8 @@ const shuffleArrayWithSeed = <T,>(array: T[], seed: string): T[] => {
 };
 
 // Helper function to parse markdown-like formatting in question text (supports nesting)
-const parseQuestionText = (text: string, keyPrefix = ""): React.ReactNode[] => {
-  const parts: React.ReactNode[] = [];
+const parseQuestionText = (text: string, keyPrefix = ""): ReactNode[] => {
+  const parts: ReactNode[] = [];
   let currentIndex = 0;
   let keyCounter = 0;
 
@@ -2515,7 +2515,7 @@ export default function SurveyPage({
     }
   };
 
-  const handleSectionSubmit = (e: React.FormEvent) => {
+  const handleSectionSubmit = (e: FormEvent) => {
     e.preventDefault();
     // Validate all questions in the current section
     const errors: ValidationErrors = {};
@@ -2755,10 +2755,10 @@ export default function SurveyPage({
                             {question.question_text
                               .split("\n")
                               .map((line, idx) => (
-                                <React.Fragment key={idx}>
+                                <Fragment key={idx}>
                                   {parseQuestionText(line)}
                                   <br />
-                                </React.Fragment>
+                                </Fragment>
                               ))}
                           </h3>
                           {question.is_required && (

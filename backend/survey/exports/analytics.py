@@ -639,11 +639,6 @@ def calculate_form_fields_numeric_analytics(question, sessions: Dict, answered_c
         respondent_values.append(parsed_map)
 
     base_count = len(respondent_values)
-    
-    # Debug logging for form_fields base_count calculation
-    if question.id == 32:  # Q32 specific logging
-        print(f"DEBUG Q32 base_count: question_id={question.id}, base_count={base_count}, initial_answered_count={answered_count}, total_sessions={len(sessions)}")
-        print(f"DEBUG Q32: respondent_values count={len(respondent_values)}")
 
     # Build values per subfield
     subfield_values: Dict[str, List[float]] = {sf: [] for sf in numeric_subfields}
