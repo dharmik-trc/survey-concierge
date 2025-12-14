@@ -490,7 +490,7 @@ class QuestionResponseAdmin(admin.ModelAdmin):
             return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
         elif obj.answer_type == 'rating':
             return f"Rating: {obj.answer}"
-        elif obj.answer_type in ['multiple_choice', 'checkbox']:
+        elif obj.answer_type in ['multiple_choice', 'checkbox', 'multiple_choices']:
             if isinstance(obj.answer, list):
                 return f"Choices: {', '.join(map(str, obj.answer))}"
             return f"Choice: {obj.answer}"
@@ -513,7 +513,7 @@ class PartialSurveyResponseAdmin(admin.ModelAdmin):
             return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
         elif obj.answer_type == 'rating':
             return f"Rating: {obj.answer}"
-        elif obj.answer_type in ['multiple_choice', 'checkbox']:
+        elif obj.answer_type in ['multiple_choice', 'checkbox', 'multiple_choices']:
             if isinstance(obj.answer, list):
                 return f"Choices: {', '.join(map(str, obj.answer))}"
             return f"Choice: {obj.answer}"

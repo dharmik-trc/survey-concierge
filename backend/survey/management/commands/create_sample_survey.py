@@ -29,7 +29,7 @@ class Command(BaseCommand):
             },
             {
                 'question_text': 'What is your age group?',
-                'question_type': 'multiple_choice',
+                'question_type': 'multiple_choices',
                 'is_required': True,
                 'order': 2,
                 'options': ['18-25', '26-35', '36-45', '46-55', '55+']

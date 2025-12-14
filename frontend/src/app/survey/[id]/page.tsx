@@ -787,20 +787,29 @@ export default function SurveyPage({
           continue;
         }
         const question = survey?.questions.find((q) => String(q.id) === qid);
-        if (question?.question_type === "multiple_choice") {
-          const otherOption = question.options?.find((opt) =>
-            opt.toLowerCase().includes("other")
-          );
-          if (ans === otherOption) {
+        if (
+          question?.question_type === "multiple_choice" ||
+          question?.question_type === "multiple_choices"
+        ) {
+          // For multiple_choice, ans is an array of selected options
+          if (Array.isArray(ans)) {
+            // Handle "Other" option if selected - replace with "Other: {text}"
+            const hasOther = ans.includes(OTHER_OPTION);
             const otherTextValue = otherTexts[qid] || "";
-            if (otherTextValue && otherTextValue.trim() !== "") {
-              sanitizedResponses[qid as string] = `Other: ${otherTextValue}`;
-            } else {
-              // If "Other" is selected but no text is provided, this should have been caught by validation
-              // But as a safety net, we'll skip this response rather than send incomplete data
-              console.warn(
-                `Skipping incomplete "Other" response for question ${qid}`
+
+            if (hasOther && otherTextValue && otherTextValue.trim() !== "") {
+              // Replace "Other, please specify" with "Other: {text}" in the array
+              sanitizedResponses[qid as string] = ans.map((option) =>
+                option === OTHER_OPTION ? `Other: ${otherTextValue}` : option
               );
+            } else if (hasOther) {
+              // Remove "Other" if no text provided
+              sanitizedResponses[qid as string] = ans.filter(
+                (option) => option !== OTHER_OPTION
+              );
+            } else {
+              // No "Other" option - preserve all selected options as-is
+              sanitizedResponses[qid as string] = ans;
             }
             continue;
           }
@@ -844,31 +853,29 @@ export default function SurveyPage({
             }
           }
         } else if (Array.isArray(ans)) {
-          // Handle checkbox with 'Other, please specify' as string[] for backend
-          const question = survey?.questions.find((q) => String(q.id) === qid);
-          const otherOption = question?.options?.find((opt) =>
-            opt.toLowerCase().includes("other")
-          );
+          // Skip if already handled (shouldn't happen, but safety check)
+          if (sanitizedResponses[qid]) {
+            continue;
+          }
+
+          // Handle arrays (for other question types that use arrays)
+          // Convert any object-based "other" entries to "Other: {text}" format
           let newAns = ans.map((v) =>
             typeof v === "object" && v !== null && "other" in v
               ? `Other: ${(v as any).other}`
               : v
           );
 
-          // Handle "Other" option in checkbox arrays
-          if (otherOption && newAns.includes(otherOption)) {
+          // Handle "Other" option if present
+          if (newAns.includes(OTHER_OPTION)) {
             const otherTextValue = otherTexts[qid] || "";
             if (otherTextValue && otherTextValue.trim() !== "") {
-              // Replace the generic "Other" with the specified text
               newAns = newAns.map((v) =>
-                v === otherOption ? `Other: ${otherTextValue}` : v
+                v === OTHER_OPTION ? `Other: ${otherTextValue}` : v
               );
             } else {
-              // Remove empty 'Other' if not filled
-              newAns = newAns.filter((v) => v !== otherOption);
-              console.warn(
-                `Removed incomplete "Other" option from checkbox question ${qid}`
-              );
+              // Remove "Other" if no text provided
+              newAns = newAns.filter((v) => v !== OTHER_OPTION);
             }
           }
           sanitizedResponses[qid as string] = newAns;
@@ -887,12 +894,9 @@ export default function SurveyPage({
           // Only include rows that have actual answers
           const filteredAnswerObj: { [row: string]: string[] } = {};
           question.rows.forEach((row) => {
-            if (
-              answerObj[row] &&
-              Array.isArray(answerObj[row]) &&
-              answerObj[row].length > 0
-            ) {
-              filteredAnswerObj[row] = answerObj[row];
+            const rowAnswer = answerObj[row];
+            if (rowAnswer && Array.isArray(rowAnswer) && rowAnswer.length > 0) {
+              filteredAnswerObj[row] = rowAnswer;
             }
           });
           // Only add if there are actual answers
@@ -913,12 +917,13 @@ export default function SurveyPage({
           // Only include rows that have actual answers
           const filteredAnswerObj: { [row: string]: string } = {};
           question.rows.forEach((row) => {
+            const rowAnswer = answerObj[row];
             if (
-              answerObj[row] &&
-              typeof answerObj[row] === "string" &&
-              answerObj[row].trim() !== ""
+              rowAnswer &&
+              typeof rowAnswer === "string" &&
+              rowAnswer.trim() !== ""
             ) {
-              filteredAnswerObj[row] = answerObj[row];
+              filteredAnswerObj[row] = rowAnswer;
             }
           });
           // Only add if there are actual answers
