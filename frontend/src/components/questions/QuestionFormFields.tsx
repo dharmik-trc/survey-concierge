@@ -70,8 +70,10 @@ export const QuestionFormFields = ({
     const numValue = inputValue === "" ? null : parseFloat(inputValue);
     const prev = typeof value === "object" && !Array.isArray(value) && value ? value : {};
     const filteredPrev: { [sub: string]: number | null } = Object.fromEntries(
-      Object.entries(prev).filter(([, v]) => v !== null && v !== "")
-    );
+      Object.entries(prev)
+        .filter(([, v]) => v !== null && v !== "")
+        .map(([k, v]) => [k, typeof v === "number" ? v : null] as [string, number | null])
+    ) as { [sub: string]: number | null };
     const next: { [sub: string]: number | null } = {
       ...filteredPrev,
       [subfield]: numValue,
