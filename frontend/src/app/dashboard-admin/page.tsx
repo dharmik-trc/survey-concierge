@@ -13,9 +13,7 @@ export default function Dashboard() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [exportingResponses, setExportingResponses] = useState(false);
-  const [generatingAnalytics, setGeneratingAnalytics] = useState<string | null>(
-    null
-  );
+  const [generatingAnalytics, setGeneratingAnalytics] = useState<string | null>(null);
 
   // Use ref to prevent duplicate requests
   const hasRequested = useRef(false);
@@ -40,9 +38,7 @@ export default function Dashboard() {
         const data = await apiService.getSurveys({ includeInactive: true });
         setSurveys(data);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch surveys"
-        );
+        setError(err instanceof Error ? err.message : "Failed to fetch surveys");
       } finally {
         setLoading(false);
       }
@@ -124,28 +120,21 @@ export default function Dashboard() {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Admin Password
               </label>
               <input
                 type="password"
                 id="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black"
                 placeholder="Enter admin password"
                 required
               />
             </div>
 
-            {authError && (
-              <div className="text-red-600 text-sm text-center">
-                {authError}
-              </div>
-            )}
+            {authError && <div className="text-red-600 text-sm text-center">{authError}</div>}
 
             <button
               type="submit"
@@ -170,9 +159,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-6"></div>
-          <p className="text-gray-600 text-lg font-medium">
-            Loading surveys...
-          </p>
+          <p className="text-gray-600 text-lg font-medium">Loading surveys...</p>
         </div>
       </div>
     );
@@ -228,16 +215,14 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                No Surveys Available
-              </h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Surveys Available</h3>
               <p className="text-gray-500">
                 Check back later for new surveys or contact the administrator.
               </p>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {surveys.map((survey) => (
+              {surveys.map(survey => (
                 <div
                   key={survey.id}
                   className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 flex flex-col"
@@ -437,8 +422,8 @@ export default function Dashboard() {
         <footer className="mt-16 text-center">
           <div className="border-t border-gray-200 pt-8">
             <p className="text-gray-500 text-sm">
-              © 2025 Survey Concierge. Professional survey platform for data
-              collection and insights.
+              © 2025 Survey Concierge. Professional survey platform for data collection and
+              insights.
             </p>
           </div>
         </footer>
