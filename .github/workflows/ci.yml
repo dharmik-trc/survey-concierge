@@ -29,12 +29,7 @@ jobs:
       - name: Frontend - Install dependencies
         if: matrix.job == 'frontend'
         working-directory: ./frontend
-        run: |
-          if [ -f package-lock.json ] && [ -s package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci
 
       - name: Frontend - Run style checks
         if: matrix.job == 'frontend'
