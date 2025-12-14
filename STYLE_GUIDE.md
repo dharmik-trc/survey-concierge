@@ -60,26 +60,18 @@ Before committing:
 ### Frontend
 ```bash
 cd frontend
-npm install
+npm install --save-dev prettier
 ```
 
 ### Backend
 ```bash
+pip install black isort flake8
+```
+
+Or install from requirements.txt (development dependencies are included):
+```bash
 pip install -r requirements.txt
 ```
 
-Development dependencies (black, isort, flake8) are included in requirements.txt.
-
-## GitHub CI/CD
-
-The project includes GitHub Actions workflows that automatically run linting checks on push and pull requests:
-
-- **`.github/workflows/lint.yml`**: Runs separate jobs for frontend and backend linting
-- **`.github/workflows/ci.yml`**: Alternative workflow using matrix strategy
-
-Both workflows check:
-- Frontend: ESLint + Prettier
-- Backend: Black + isort + flake8
-
-The workflows run automatically on pushes to `main`/`develop` branches and on all pull requests.
+Development dependencies (black, isort, flake8) are at the bottom of requirements.txt and are optional.
 
