@@ -30,9 +30,7 @@ export default function SearchableDropdown({
       setFilteredOptions(options);
     } else {
       setFilteredOptions(
-        options.filter((option) =>
-          option.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        options.filter(option => option.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
   }, [searchTerm, options]);
@@ -40,10 +38,7 @@ export default function SearchableDropdown({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm("");
       }
@@ -66,14 +61,10 @@ export default function SearchableDropdown({
     }
   };
 
-  const selectedOption = options.find((option) => option === value);
+  const selectedOption = options.find(option => option === value);
 
   return (
-    <div
-      className={`relative ${className}`}
-      ref={dropdownRef}
-      style={{ zIndex: "auto" }}
-    >
+    <div className={`relative ${className}`} ref={dropdownRef} style={{ zIndex: "auto" }}>
       {/* Selected value display */}
       <button
         type="button"
@@ -92,12 +83,7 @@ export default function SearchableDropdown({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
@@ -113,7 +99,7 @@ export default function SearchableDropdown({
               type="text"
               placeholder="Start typing..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900"
               autoFocus
             />
@@ -128,18 +114,14 @@ export default function SearchableDropdown({
                   type="button"
                   onClick={() => handleSelect(option)}
                   className={`w-full px-4 py-2 text-left hover:bg-indigo-50 transition-colors duration-150 ${
-                    option === value
-                      ? "bg-indigo-100 text-indigo-900 font-medium"
-                      : "text-gray-700"
+                    option === value ? "bg-indigo-100 text-indigo-900 font-medium" : "text-gray-700"
                   } ${index === filteredOptions.length - 1 ? "mb-1" : ""}`}
                 >
                   {option}
                 </button>
               ))
             ) : (
-              <div className="px-4 py-3 text-gray-500 text-sm text-center">
-                No options found
-              </div>
+              <div className="px-4 py-3 text-gray-500 text-sm text-center">No options found</div>
             )}
           </div>
         </div>

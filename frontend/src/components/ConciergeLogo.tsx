@@ -6,10 +6,7 @@ interface ConciergeLogoProps {
   className?: string;
 }
 
-export default function ConciergeLogo({
-  size = "md",
-  className = "",
-}: ConciergeLogoProps) {
+export default function ConciergeLogo({ size = "md", className = "" }: ConciergeLogoProps) {
   // Responsive size classes for TSC Concierge logo
   const sizePx = {
     sm: 82,

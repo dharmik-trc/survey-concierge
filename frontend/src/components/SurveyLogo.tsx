@@ -7,11 +7,7 @@ interface SurveyLogoProps {
   logoSrc?: string | null; // Survey company logo URL
 }
 
-export default function SurveyLogo({
-  size = "md",
-  className = "",
-  logoSrc,
-}: SurveyLogoProps) {
+export default function SurveyLogo({ size = "md", className = "", logoSrc }: SurveyLogoProps) {
   // Responsive size classes for survey company logos
   const sizePx = {
     sm: 72,

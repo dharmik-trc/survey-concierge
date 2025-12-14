@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, use, useMemo } from "react";
+import { useState, useEffect, useRef, use, Fragment } from "react";
+import type { ReactNode, FormEvent } from "react";
 import {
   apiService,
   Survey as SurveyType,
@@ -10,7 +11,6 @@ import {
   DEFAULT_NONE_OPTION,
 } from "../../../lib/api";
 import { cookieUtils, CookieData } from "../../../lib";
-import React from "react"; // Added missing import for React
 import SearchableDropdown from "../../../components/SearchableDropdown";
 
 interface SurveyResponse {
@@ -48,8 +48,8 @@ const shuffleArrayWithSeed = <T,>(array: T[], seed: string): T[] => {
 };
 
 // Helper function to parse markdown-like formatting in question text (supports nesting)
-const parseQuestionText = (text: string, keyPrefix = ""): React.ReactNode[] => {
-  const parts: React.ReactNode[] = [];
+const parseQuestionText = (text: string, keyPrefix = ""): ReactNode[] => {
+  const parts: ReactNode[] = [];
   let currentIndex = 0;
   let keyCounter = 0;
 
@@ -105,13 +105,7 @@ const parseQuestionText = (text: string, keyPrefix = ""): React.ReactNode[] => {
 const validateSubfield = (
   fieldName: string,
   value: any,
-  type:
-    | "positive_number"
-    | "negative_number"
-    | "all_numbers"
-    | "email"
-    | "text"
-    | "auto_calculate"
+  type: "positive_number" | "negative_number" | "all_numbers" | "email" | "text" | "auto_calculate"
 ): string | null => {
   const stringValue = String(value).trim();
 
@@ -159,20 +153,14 @@ const validateSubfield = (
   return null;
 };
 
-export default function SurveyPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: surveyId } = use(params);
   const [survey, setSurvey] = useState<SurveyType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isClosed, setIsClosed] = useState<boolean>(false);
   const [responses, setResponses] = useState<SurveyResponse>({});
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
-    {}
-  );
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -195,11 +183,8 @@ export default function SurveyPage({
       return randomizedOptions[question.id];
     }
 
-    const { options } = optionUtils.getOptionsWithSpecialHandling(
-      question,
-      surveyId
-    );
-    setRandomizedOptions((prev) => ({
+    const { options } = optionUtils.getOptionsWithSpecialHandling(question, surveyId);
+    setRandomizedOptions(prev => ({
       ...prev,
       [question.id]: options,
     }));
@@ -261,11 +246,8 @@ export default function SurveyPage({
 
             // Initialize slider questions to their median value
             const initialSliderValues: SurveyResponse = {};
-            data.questions.forEach((q) => {
-              if (
-                q.secondary_type === "slider" ||
-                q.question_type === "slider"
-              ) {
+            data.questions.forEach(q => {
+              if (q.secondary_type === "slider" || q.question_type === "slider") {
                 const min = q.scale_min ?? 0;
                 const max = q.scale_max ?? 10;
                 const median = Math.round((min + max) / 2);
@@ -274,10 +256,7 @@ export default function SurveyPage({
             });
             if (Object.keys(initialSliderValues).length > 0) {
               setResponses(initialSliderValues);
-              console.log(
-                "Initialized slider values to median:",
-                initialSliderValues
-              );
+              console.log("Initialized slider values to median:", initialSliderValues);
             }
           } else {
             // Valid index, restore progress normally
@@ -292,7 +271,7 @@ export default function SurveyPage({
 
           // Initialize slider questions to their median value to avoid bias
           const initialSliderValues: SurveyResponse = {};
-          data.questions.forEach((q) => {
+          data.questions.forEach(q => {
             if (q.secondary_type === "slider" || q.question_type === "slider") {
               const min = q.scale_min ?? 0;
               const max = q.scale_max ?? 10;
@@ -302,10 +281,7 @@ export default function SurveyPage({
           });
           if (Object.keys(initialSliderValues).length > 0) {
             setResponses(initialSliderValues);
-            console.log(
-              "Initialized slider values to median:",
-              initialSliderValues
-            );
+            console.log("Initialized slider values to median:", initialSliderValues);
           }
         }
       } catch (err) {
@@ -384,7 +360,7 @@ export default function SurveyPage({
     value: any,
     questionType: string
   ): string | null => {
-    const question = survey?.questions.find((q) => q.id === questionId);
+    const question = survey?.questions.find(q => q.id === questionId);
     if (!question) return null;
 
     console.log(`Validating question ${questionId}:`, {
@@ -417,20 +393,14 @@ export default function SurveyPage({
 
       case "number":
         if (!validateNumber(value)) {
-          console.log(
-            `Question ${questionId} number validation failed:`,
-            value
-          );
+          console.log(`Question ${questionId} number validation failed:`, value);
           return "Please enter a valid number";
         }
         break;
 
       case "positive_number":
         if (!validateNumber(value)) {
-          console.log(
-            `Question ${questionId} positive number validation failed:`,
-            value
-          );
+          console.log(`Question ${questionId} positive number validation failed:`, value);
           return "Please enter a valid number";
         }
         // Additional validation for positive numbers (including 0)
@@ -441,10 +411,7 @@ export default function SurveyPage({
 
       case "negative_number":
         if (!validateNumber(value)) {
-          console.log(
-            `Question ${questionId} negative number validation failed:`,
-            value
-          );
+          console.log(`Question ${questionId} negative number validation failed:`, value);
           return "Please enter a valid number";
         }
         // Additional validation for negative numbers (including 0)
@@ -461,13 +428,8 @@ export default function SurveyPage({
             );
             return "Please select at least one option";
           }
-        } else if (
-          !value ||
-          (typeof value === "string" && value.trim() === "")
-        ) {
-          console.log(
-            `Question ${questionId} multiple choice validation failed: empty value`
-          );
+        } else if (!value || (typeof value === "string" && value.trim() === "")) {
+          console.log(`Question ${questionId} multiple choice validation failed: empty value`);
           return "Please select at least one option";
         }
         break;
@@ -480,9 +442,7 @@ export default function SurveyPage({
           return "Please select an option";
         }
         // Check if "Other" option is selected but no specification is provided
-        const otherOption = question.options?.find((opt) =>
-          opt.toLowerCase().includes("other")
-        );
+        const otherOption = question.options?.find(opt => opt.toLowerCase().includes("other"));
         if (value === otherOption && otherOption) {
           const otherText = otherTexts[questionId] || "";
           if (!otherText || otherText.trim() === "") {
@@ -493,21 +453,14 @@ export default function SurveyPage({
 
       case "fields":
         if (!Array.isArray(value) || value.length === 0) {
-          console.log(
-            `Question ${questionId} checkbox validation failed:`,
-            value
-          );
+          console.log(`Question ${questionId} checkbox validation failed:`, value);
           return "Please select at least one option";
         }
         // Check if "Other" option is selected but no specification is provided
-        const checkboxOtherOption = question.options?.find((opt) =>
+        const checkboxOtherOption = question.options?.find(opt =>
           opt.toLowerCase().includes("other")
         );
-        if (
-          checkboxOtherOption &&
-          Array.isArray(value) &&
-          value.includes(checkboxOtherOption)
-        ) {
+        if (checkboxOtherOption && Array.isArray(value) && value.includes(checkboxOtherOption)) {
           const otherText = otherTexts[questionId] || "";
           if (!otherText || otherText.trim() === "") {
             return "Please specify your other option";
@@ -560,29 +513,19 @@ export default function SurveyPage({
 
             if (
               validation?.required == true &&
-              (fieldValue === undefined ||
-                fieldValue === null ||
-                fieldValue === "")
+              (fieldValue === undefined || fieldValue === null || fieldValue === "")
             ) {
               return `${subfield} is required`;
             }
 
             // Skip validation if field is empty and not required
-            if (
-              fieldValue === undefined ||
-              fieldValue === null ||
-              fieldValue === ""
-            ) {
+            if (fieldValue === undefined || fieldValue === null || fieldValue === "") {
               continue;
             }
 
             // Validate based on field type
             const validationType = validation?.type || "all_numbers";
-            const error = validateSubfield(
-              subfield,
-              fieldValue,
-              validationType
-            );
+            const error = validateSubfield(subfield, fieldValue, validationType);
             if (error) {
               return error;
             }
@@ -634,14 +577,14 @@ export default function SurveyPage({
       | { [row: string]: string }
       | { [row: string]: string[] }
   ) => {
-    setResponses((prev) => ({
+    setResponses(prev => ({
       ...prev,
       [questionId]: value,
     }));
 
     // Clear validation error when user starts typing
     if (validationErrors[questionId]) {
-      setValidationErrors((prev) => {
+      setValidationErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[questionId];
         return newErrors;
@@ -649,13 +592,9 @@ export default function SurveyPage({
     }
   };
 
-  const handleBlur = (
-    questionId: number | string,
-    value: any,
-    _questionType: string
-  ) => {
+  const handleBlur = (questionId: number | string, value: any, _questionType: string) => {
     const error = validateQuestion(questionId, value, _questionType);
-    setValidationErrors((prev) => ({
+    setValidationErrors(prev => ({
       ...prev,
       [questionId]: error || "",
     }));
@@ -675,7 +614,7 @@ export default function SurveyPage({
     );
 
     if (error) {
-      setValidationErrors((prev) => ({
+      setValidationErrors(prev => ({
         ...prev,
         [currentQuestion.id]: error,
       }));
@@ -709,10 +648,7 @@ export default function SurveyPage({
           answerToSave,
           sessionId
         );
-        console.log(
-          `Partial response saved for question ${currentQuestion.id}:`,
-          answerToSave
-        );
+        console.log(`Partial response saved for question ${currentQuestion.id}:`, answerToSave);
       } catch (error) {
         console.error("Failed to save partial response:", error);
         // Don't block the user flow if partial save fails
@@ -720,13 +656,13 @@ export default function SurveyPage({
     }
 
     if (currentQuestionIndex < survey.questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
+      setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
@@ -741,7 +677,7 @@ export default function SurveyPage({
     const errors: ValidationErrors = {};
     let hasErrors = false;
 
-    survey.questions.forEach((question) => {
+    survey.questions.forEach(question => {
       const value = responses[question.id];
       console.log(`Validating question ${question.id}:`, {
         value,
@@ -768,7 +704,7 @@ export default function SurveyPage({
     if (hasErrors) {
       setValidationErrors(errors);
       // Jump to the first question with an error
-      const firstErrorIndex = survey.questions.findIndex((q) => errors[q.id]);
+      const firstErrorIndex = survey.questions.findIndex(q => errors[q.id]);
       if (firstErrorIndex !== -1) {
         setCurrentQuestionIndex(firstErrorIndex);
       }
@@ -786,7 +722,7 @@ export default function SurveyPage({
         if (qid.endsWith("_comment")) {
           continue;
         }
-        const question = survey?.questions.find((q) => String(q.id) === qid);
+        const question = survey?.questions.find(q => String(q.id) === qid);
         if (
           question?.question_type === "multiple_choice" ||
           question?.question_type === "multiple_choices"
@@ -799,14 +735,12 @@ export default function SurveyPage({
 
             if (hasOther && otherTextValue && otherTextValue.trim() !== "") {
               // Replace "Other, please specify" with "Other: {text}" in the array
-              sanitizedResponses[qid as string] = ans.map((option) =>
+              sanitizedResponses[qid as string] = ans.map(option =>
                 option === OTHER_OPTION ? `Other: ${otherTextValue}` : option
               );
             } else if (hasOther) {
               // Remove "Other" if no text provided
-              sanitizedResponses[qid as string] = ans.filter(
-                (option) => option !== OTHER_OPTION
-              );
+              sanitizedResponses[qid as string] = ans.filter(option => option !== OTHER_OPTION);
             } else {
               // No "Other" option - preserve all selected options as-is
               sanitizedResponses[qid as string] = ans;
@@ -817,32 +751,22 @@ export default function SurveyPage({
         if (ans && typeof ans === "object" && !Array.isArray(ans)) {
           // cross_matrix, grid_radio or form_fields
           const questionType =
-            survey?.questions.find((q) => String(q.id) === qid)
-              ?.secondary_type ||
-            survey?.questions.find((q) => String(q.id) === qid)?.question_type;
-          if (
-            questionType === "cross_matrix" ||
-            questionType === "grid_radio"
-          ) {
+            survey?.questions.find(q => String(q.id) === qid)?.secondary_type ||
+            survey?.questions.find(q => String(q.id) === qid)?.question_type;
+          if (questionType === "cross_matrix" || questionType === "grid_radio") {
             sanitizedResponses[qid as string] = ans;
           } else if (questionType === "form_fields") {
             // form_fields
             const sanitized: { [subfield: string]: any } = {};
             let hasValidData = false;
             for (const [sub, val] of Object.entries(ans)) {
-              if (
-                val !== undefined &&
-                val !== null &&
-                val !== "" &&
-                val !== 0
-              ) {
+              if (val !== undefined && val !== null && val !== "" && val !== 0) {
                 // For form_fields, preserve the original data type
                 if (questionType === "form_fields") {
                   sanitized[sub as string] = val;
                 } else {
                   // Legacy: convert to number (backward compatibility for old matrix questions)
-                  sanitized[sub as string] =
-                    typeof val === "number" ? val : Number(val);
+                  sanitized[sub as string] = typeof val === "number" ? val : Number(val);
                 }
                 hasValidData = true;
               }
@@ -860,22 +784,18 @@ export default function SurveyPage({
 
           // Handle arrays (for other question types that use arrays)
           // Convert any object-based "other" entries to "Other: {text}" format
-          let newAns = ans.map((v) =>
-            typeof v === "object" && v !== null && "other" in v
-              ? `Other: ${(v as any).other}`
-              : v
+          let newAns = ans.map(v =>
+            typeof v === "object" && v !== null && "other" in v ? `Other: ${(v as any).other}` : v
           );
 
           // Handle "Other" option if present
           if (newAns.includes(OTHER_OPTION)) {
             const otherTextValue = otherTexts[qid] || "";
             if (otherTextValue && otherTextValue.trim() !== "") {
-              newAns = newAns.map((v) =>
-                v === OTHER_OPTION ? `Other: ${otherTextValue}` : v
-              );
+              newAns = newAns.map(v => (v === OTHER_OPTION ? `Other: ${otherTextValue}` : v));
             } else {
               // Remove "Other" if no text provided
-              newAns = newAns.filter((v) => v !== OTHER_OPTION);
+              newAns = newAns.filter(v => v !== OTHER_OPTION);
             }
           }
           sanitizedResponses[qid as string] = newAns;
@@ -888,12 +808,11 @@ export default function SurveyPage({
             question?.secondary_type === "grid_multi") &&
           question.rows
         ) {
-          const answerObj =
-            typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
+          const answerObj = typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
           // Only include rows that have actual answers
           const filteredAnswerObj: { [row: string]: string[] } = {};
-          question.rows.forEach((row) => {
+          question.rows.forEach(row => {
             const rowAnswer = answerObj[row];
             if (rowAnswer && Array.isArray(rowAnswer) && rowAnswer.length > 0) {
               filteredAnswerObj[row] = rowAnswer;
@@ -911,18 +830,13 @@ export default function SurveyPage({
             question?.secondary_type === "grid_radio") &&
           question.rows
         ) {
-          const answerObj =
-            typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
+          const answerObj = typeof ans === "object" && !Array.isArray(ans) ? { ...ans } : {};
           if (!question.rows) continue;
           // Only include rows that have actual answers
           const filteredAnswerObj: { [row: string]: string } = {};
-          question.rows.forEach((row) => {
+          question.rows.forEach(row => {
             const rowAnswer = answerObj[row];
-            if (
-              rowAnswer &&
-              typeof rowAnswer === "string" &&
-              rowAnswer.trim() !== ""
-            ) {
+            if (rowAnswer && typeof rowAnswer === "string" && rowAnswer.trim() !== "") {
               filteredAnswerObj[row] = rowAnswer;
             }
           });
@@ -936,27 +850,17 @@ export default function SurveyPage({
 
       // Add comment box responses separately
       for (const [qid, comment] of Object.entries(responses)) {
-        if (
-          qid.endsWith("_comment") &&
-          comment &&
-          String(comment).trim() !== ""
-        ) {
+        if (qid.endsWith("_comment") && comment && String(comment).trim() !== "") {
           sanitizedResponses[qid] = comment;
         }
       }
 
-      const result = await apiService.submitSurveyResponse(
-        surveyId,
-        sanitizedResponses,
-        sessionId
-      );
+      const result = await apiService.submitSurveyResponse(surveyId, sanitizedResponses, sessionId);
       console.log("Survey submitted successfully:", result);
 
       // Clear saved progress from cookies after successful submission
       cookieUtils.clearSurveyProgress(surveyId);
-      console.log(
-        "Cleared survey progress cookies after successful submission"
-      );
+      console.log("Cleared survey progress cookies after successful submission");
 
       setSubmitted(true);
     } catch (error) {
@@ -970,8 +874,7 @@ export default function SurveyPage({
           errorMessage =
             "Please complete all required fields in the current section before proceeding.";
         } else if (error.message.includes("This field is required")) {
-          errorMessage =
-            "Please answer all required questions before submitting.";
+          errorMessage = "Please answer all required questions before submitting.";
         } else if (error.message.includes("Bad Request")) {
           errorMessage =
             "There was an issue with your responses. Please check all required fields.";
@@ -996,8 +899,7 @@ export default function SurveyPage({
         : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
     }`;
 
-    const questionType =
-      question.secondary_type || question.question_type || "text";
+    const questionType = question.secondary_type || question.question_type || "text";
 
     switch (questionType) {
       case "text":
@@ -1009,20 +911,12 @@ export default function SurveyPage({
               placeholder="Enter your answer..."
               value={(value as string) || ""}
               maxLength={99999}
-              onChange={(e) =>
-                handleResponseChange(question.id, e.target.value)
-              }
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
+              onChange={e => handleResponseChange(question.id, e.target.value)}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1044,20 +938,12 @@ export default function SurveyPage({
               placeholder="Enter your answer..."
               value={(value as string) || ""}
               maxLength={99999}
-              onChange={(e) =>
-                handleResponseChange(question.id, e.target.value)
-              }
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
+              onChange={e => handleResponseChange(question.id, e.target.value)}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1078,20 +964,12 @@ export default function SurveyPage({
               className={inputClasses}
               placeholder="Enter your email address..."
               value={(value as string) || ""}
-              onChange={(e) =>
-                handleResponseChange(question.id, e.target.value)
-              }
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
+              onChange={e => handleResponseChange(question.id, e.target.value)}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1124,7 +1002,7 @@ export default function SurveyPage({
               className={inputClasses}
               placeholder={getNumberPlaceholder()}
               value={(value as number) || ""}
-              onChange={(e) => {
+              onChange={e => {
                 const inputValue = e.target.value;
                 if (inputValue === "") {
                   handleResponseChange(question.id, "");
@@ -1135,18 +1013,12 @@ export default function SurveyPage({
                   }
                 }
               }}
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
-              onWheel={(e) => e.currentTarget.blur()}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
+              onWheel={e => e.currentTarget.blur()}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1178,12 +1050,8 @@ export default function SurveyPage({
                 max={scaleMax}
                 step={scaleStep}
                 value={currentValue}
-                onChange={(e) =>
-                  handleResponseChange(question.id, parseInt(e.target.value))
-                }
-                onBlur={() =>
-                  handleBlur(question.id, currentValue, questionType)
-                }
+                onChange={e => handleResponseChange(question.id, parseInt(e.target.value))}
+                onBlur={() => handleBlur(question.id, currentValue, questionType)}
                 className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb"
                 style={{
                   background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${
@@ -1233,13 +1101,9 @@ export default function SurveyPage({
 
             <div className="flex justify-between items-center px-2">
               <div className="flex flex-col items-start">
-                <span className="text-2xl font-bold text-indigo-600">
-                  {currentValue}
-                </span>
+                <span className="text-2xl font-bold text-indigo-600">{currentValue}</span>
                 {scaleMinLabel && (
-                  <span className="text-xs text-gray-500 mt-1">
-                    {scaleMinLabel}
-                  </span>
+                  <span className="text-xs text-gray-500 mt-1">{scaleMinLabel}</span>
                 )}
               </div>
               {scaleMaxLabel && (
@@ -1256,11 +1120,7 @@ export default function SurveyPage({
 
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1280,20 +1140,12 @@ export default function SurveyPage({
               type="date"
               className={inputClasses}
               value={(value as string) || ""}
-              onChange={(e) =>
-                handleResponseChange(question.id, e.target.value)
-              }
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
+              onChange={e => handleResponseChange(question.id, e.target.value)}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1313,20 +1165,12 @@ export default function SurveyPage({
               type="time"
               className={inputClasses}
               value={(value as string) || ""}
-              onChange={(e) =>
-                handleResponseChange(question.id, e.target.value)
-              }
-              onBlur={(e) =>
-                handleBlur(question.id, e.target.value, questionType)
-              }
+              onChange={e => handleResponseChange(question.id, e.target.value)}
+              onBlur={e => handleBlur(question.id, e.target.value, questionType)}
             />
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1342,8 +1186,10 @@ export default function SurveyPage({
       case "multiple_choices": {
         // Get processed options with special handling
         const randomizedOptions = getRandomizedOptions(question);
-        const { hasOtherOption, hasNoneOption } =
-          optionUtils.getOptionsWithSpecialHandling(question, surveyId);
+        const { hasOtherOption, hasNoneOption } = optionUtils.getOptionsWithSpecialHandling(
+          question,
+          surveyId
+        );
 
         const otherOption = OTHER_OPTION;
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
@@ -1351,29 +1197,23 @@ export default function SurveyPage({
         const selectedValues = Array.isArray(value) ? value : [];
         const isOtherSelected =
           selectedValues.includes(otherOption) ||
-          selectedValues.some(
-            (v) => typeof v === "string" && v.startsWith("Other:")
-          );
+          selectedValues.some(v => typeof v === "string" && v.startsWith("Other:"));
         const isNoneSelected = selectedValues.includes(noneOption);
         const isExclusiveSelected = exclusiveOption
           ? selectedValues.includes(exclusiveOption)
           : false;
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
-          setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
+          setOtherTexts(prev => ({ ...prev, [question.id]: text }));
 
         // Handle checkbox selection with mutual exclusion logic
-        const handleCheckboxChange = (
-          selectedOption: string,
-          isChecked: boolean
-        ) => {
+        const handleCheckboxChange = (selectedOption: string, isChecked: boolean) => {
           let newValues = [...selectedValues];
 
           // Check if this is "None of the above" - always exclusive
           const isNoneOfTheAbove = selectedOption === noneOption;
           // Check if this is a custom exclusive option
-          const isCustomExclusive =
-            exclusiveOption && selectedOption === exclusiveOption;
+          const isCustomExclusive = exclusiveOption && selectedOption === exclusiveOption;
           const isExclusiveOption = isNoneOfTheAbove || isCustomExclusive;
 
           if (isExclusiveOption) {
@@ -1387,10 +1227,10 @@ export default function SurveyPage({
           } else {
             // If any non-exclusive option is selected, remove "None of the above" and custom exclusive options
             if (isNoneSelected) {
-              newValues = newValues.filter((v) => v !== noneOption);
+              newValues = newValues.filter(v => v !== noneOption);
             }
             if (isExclusiveSelected && exclusiveOption) {
-              newValues = newValues.filter((v) => v !== exclusiveOption);
+              newValues = newValues.filter(v => v !== exclusiveOption);
             }
 
             if (isChecked) {
@@ -1403,13 +1243,11 @@ export default function SurveyPage({
               if (selectedOption === otherOption) {
                 // Remove both raw 'Other' and any 'Other: ...' value
                 newValues = newValues.filter(
-                  (v) =>
-                    v !== otherOption &&
-                    !(typeof v === "string" && v.startsWith("Other:"))
+                  v => v !== otherOption && !(typeof v === "string" && v.startsWith("Other:"))
                 );
                 setOtherText("");
               } else {
-                newValues = newValues.filter((v) => v !== selectedOption);
+                newValues = newValues.filter(v => v !== selectedOption);
               }
             }
           }
@@ -1418,15 +1256,14 @@ export default function SurveyPage({
         };
 
         // Standard layout for multiple choice questions (checkboxes)
-        const columns =
-          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+        const columns = optionUtils.organizeOptionsIntoColumns(randomizedOptions);
 
         if (columns.length === 1) {
           // Single column layout - one option below the other
           return (
             <div>
               <div className="space-y-3">
-                {columns[0].map((option) => (
+                {columns[0].map(option => (
                   <label
                     key={option}
                     className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
@@ -1438,17 +1275,10 @@ export default function SurveyPage({
                       checked={
                         selectedValues.includes(option) ||
                         (option === otherOption &&
-                          selectedValues.some(
-                            (v) =>
-                              typeof v === "string" && v.startsWith("Other:")
-                          ))
+                          selectedValues.some(v => typeof v === "string" && v.startsWith("Other:")))
                       }
-                      onChange={(e) =>
-                        handleCheckboxChange(option, e.target.checked)
-                      }
-                      onBlur={() =>
-                        handleBlur(question.id, selectedValues, questionType)
-                      }
+                      onChange={e => handleCheckboxChange(option, e.target.checked)}
+                      onBlur={() => handleBlur(question.id, selectedValues, questionType)}
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
@@ -1466,13 +1296,11 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
                         // Update the array to replace "Other (please specify)" with "Other: [text]"
-                        const newValues = selectedValues.filter(
-                          (v) => v !== otherOption
-                        );
+                        const newValues = selectedValues.filter(v => v !== otherOption);
                         newValues.push(`Other: ${otherText.trim()}`);
                         handleResponseChange(question.id, newValues);
                       }
@@ -1482,11 +1310,7 @@ export default function SurveyPage({
               )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1505,7 +1329,7 @@ export default function SurveyPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {columns.map((column, colIndex) => (
                   <div key={colIndex} className="space-y-2 sm:space-y-3">
-                    {column.map((option) => (
+                    {column.map(option => (
                       <label
                         key={option}
                         className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
@@ -1518,21 +1342,11 @@ export default function SurveyPage({
                             selectedValues.includes(option) ||
                             (option === otherOption &&
                               selectedValues.some(
-                                (v) =>
-                                  typeof v === "string" &&
-                                  v.startsWith("Other:")
+                                v => typeof v === "string" && v.startsWith("Other:")
                               ))
                           }
-                          onChange={(e) =>
-                            handleCheckboxChange(option, e.target.checked)
-                          }
-                          onBlur={() =>
-                            handleBlur(
-                              question.id,
-                              selectedValues,
-                              questionType
-                            )
-                          }
+                          onChange={e => handleCheckboxChange(option, e.target.checked)}
+                          onBlur={() => handleBlur(question.id, selectedValues, questionType)}
                           className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         />
                         <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
@@ -1552,13 +1366,11 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
                         // Update the array to replace "Other (please specify)" with "Other: [text]"
-                        const newValues = selectedValues.filter(
-                          (v) => v !== otherOption
-                        );
+                        const newValues = selectedValues.filter(v => v !== otherOption);
                         newValues.push(`Other: ${otherText.trim()}`);
                         handleResponseChange(question.id, newValues);
                       }
@@ -1568,11 +1380,7 @@ export default function SurveyPage({
               )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1592,27 +1400,27 @@ export default function SurveyPage({
       case "yes_no": {
         // Get processed options with special handling
         const randomizedOptions = getRandomizedOptions(question);
-        const { hasOtherOption, hasNoneOption } =
-          optionUtils.getOptionsWithSpecialHandling(question, surveyId);
+        const { hasOtherOption, hasNoneOption } = optionUtils.getOptionsWithSpecialHandling(
+          question,
+          surveyId
+        );
 
         const otherOption = OTHER_OPTION;
         const noneOption = question.none_option_text || DEFAULT_NONE_OPTION;
         const exclusiveOption = question.exclusive_column;
         const isOtherSelected =
-          value === otherOption ||
-          (typeof value === "string" && value.startsWith("Other:"));
+          value === otherOption || (typeof value === "string" && value.startsWith("Other:"));
         const isNoneSelected = value === noneOption;
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
-          setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
+          setOtherTexts(prev => ({ ...prev, [question.id]: text }));
 
         // Handle option selection with mutual exclusion logic
         const handleOptionChange = (selectedOption: string) => {
           // Check if this is an exclusive option (custom exclusive only)
           // NOTA is only exclusive if it's specifically set as the exclusive column
           // Other option is NOT exclusive - it can be selected with other options
-          const isExclusiveOption =
-            exclusiveOption && selectedOption === exclusiveOption;
+          const isExclusiveOption = exclusiveOption && selectedOption === exclusiveOption;
 
           if (isExclusiveOption) {
             // If any exclusive option is selected, clear other text
@@ -1631,9 +1439,7 @@ export default function SurveyPage({
             <div>
               <SearchableDropdown
                 value={typeof value === "string" ? value : ""}
-                onChange={(selectedValue: string) =>
-                  handleOptionChange(selectedValue)
-                }
+                onChange={(selectedValue: string) => handleOptionChange(selectedValue)}
                 onBlur={() => handleBlur(question.id, value, questionType)}
                 options={randomizedOptions}
                 placeholder="Start typing..."
@@ -1648,13 +1454,10 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
-                        handleResponseChange(
-                          question.id,
-                          `Other: ${otherText.trim()}`
-                        );
+                        handleResponseChange(question.id, `Other: ${otherText.trim()}`);
                       }
                     }}
                   />
@@ -1662,11 +1465,7 @@ export default function SurveyPage({
               )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1681,15 +1480,14 @@ export default function SurveyPage({
         }
 
         // Standard layout for all multiple choice questions
-        const columns =
-          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+        const columns = optionUtils.organizeOptionsIntoColumns(randomizedOptions);
 
         if (columns.length === 1) {
           // Single column layout - one option below the other
           return (
             <div>
               <div className="space-y-3">
-                {columns[0].map((option) => (
+                {columns[0].map(option => (
                   <label
                     key={option}
                     className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
@@ -1704,10 +1502,8 @@ export default function SurveyPage({
                           typeof value === "string" &&
                           value.startsWith("Other:"))
                       }
-                      onChange={(e) => handleOptionChange(option)}
-                      onBlur={() =>
-                        handleBlur(question.id, value, questionType)
-                      }
+                      onChange={e => handleOptionChange(option)}
+                      onBlur={() => handleBlur(question.id, value, questionType)}
                       className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                     />
                     <span className="ml-2 sm:ml-3 text-gray-700 font-medium text-xs sm:text-base">
@@ -1725,13 +1521,10 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
-                        handleResponseChange(
-                          question.id,
-                          `Other: ${otherText.trim()}`
-                        );
+                        handleResponseChange(question.id, `Other: ${otherText.trim()}`);
                       }
                     }}
                   />
@@ -1739,11 +1532,7 @@ export default function SurveyPage({
               )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1762,7 +1551,7 @@ export default function SurveyPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {columns.map((column, colIndex) => (
                   <div key={colIndex} className="space-y-2 sm:space-y-3">
-                    {column.map((option) => (
+                    {column.map(option => (
                       <label
                         key={option}
                         className="flex items-center px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
@@ -1777,14 +1566,12 @@ export default function SurveyPage({
                               typeof value === "string" &&
                               value.startsWith("Other:"))
                           }
-                          onChange={(e) => handleOptionChange(option)}
+                          onChange={e => handleOptionChange(option)}
                           onBlur={() =>
                             handleBlur(
                               question.id,
                               value,
-                              question.secondary_type ||
-                                question.question_type ||
-                                "text"
+                              question.secondary_type || question.question_type || "text"
                             )
                           }
                           className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300"
@@ -1806,13 +1593,10 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
-                        handleResponseChange(
-                          question.id,
-                          `Other: ${otherText.trim()}`
-                        );
+                        handleResponseChange(question.id, `Other: ${otherText.trim()}`);
                       }
                     }}
                   />
@@ -1820,11 +1604,7 @@ export default function SurveyPage({
               )}
               {error && (
                 <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1850,22 +1630,17 @@ export default function SurveyPage({
         const selectedValues = Array.isArray(value) ? value : [];
         const isOtherChecked =
           selectedValues.includes(otherOption) ||
-          selectedValues.some(
-            (v) => typeof v === "string" && v.startsWith("Other:")
-          );
+          selectedValues.some(v => typeof v === "string" && v.startsWith("Other:"));
         const otherText = otherTexts[question.id] || "";
         const setOtherText = (text: string) =>
-          setOtherTexts((prev) => ({ ...prev, [question.id]: text }));
+          setOtherTexts(prev => ({ ...prev, [question.id]: text }));
         const optionPairs = chunkArray(randomizedOptions, 2);
         return (
           <div>
             <div className="space-y-3">
               {optionPairs.map((pair, rowIdx) => (
-                <div
-                  key={rowIdx}
-                  className="flex flex-col sm:flex-row gap-2 sm:gap-4"
-                >
-                  {pair.map((option) => (
+                <div key={rowIdx} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                  {pair.map(option => (
                     <label
                       key={option}
                       className="flex items-center flex-1 p-2 sm:p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors duration-200"
@@ -1874,7 +1649,7 @@ export default function SurveyPage({
                         type="checkbox"
                         value={option}
                         checked={selectedValues.includes(option)}
-                        onChange={(e) => {
+                        onChange={e => {
                           let newValues = Array.isArray(value) ? value : [];
 
                           // Check if this is "None of the above" option
@@ -1888,29 +1663,24 @@ export default function SurveyPage({
                               setOtherText("");
                             } else {
                               // If any other option is selected, remove "None of the above"
-                              newValues = [
-                                ...newValues.filter((v) => v !== noneOption),
-                                option,
-                              ];
+                              newValues = [...newValues.filter(v => v !== noneOption), option];
                             }
                           } else {
-                            newValues = newValues.filter((v) => v !== option);
+                            newValues = newValues.filter(v => v !== option);
                           }
 
                           if (option === otherOption && !e.target.checked) {
                             setOtherText("");
                           }
 
-                          const safeValues: string[] = newValues.map((v) =>
+                          const safeValues: string[] = newValues.map(v =>
                             typeof v === "object" && v !== null && "other" in v
                               ? `Other: ${(v as any).other}`
                               : v
                           );
                           handleResponseChange(question.id, safeValues);
                         }}
-                        onBlur={() =>
-                          handleBlur(question.id, value, questionType)
-                        }
+                        onBlur={() => handleBlur(question.id, value, questionType)}
                         className="w-4 h-4 flex-shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
                       <span className="ml-3 text-gray-700 font-medium text-xs sm:text-base">
@@ -1928,13 +1698,10 @@ export default function SurveyPage({
                     placeholder="Please specify..."
                     value={otherText}
                     maxLength={99999}
-                    onChange={(e) => setOtherText(e.target.value)}
+                    onChange={e => setOtherText(e.target.value)}
                     onBlur={() => {
                       if (otherText.trim()) {
-                        handleResponseChange(
-                          question.id,
-                          `Other: ${otherText.trim()}`
-                        );
+                        handleResponseChange(question.id, `Other: ${otherText.trim()}`);
                       }
                     }}
                   />
@@ -1943,11 +1710,7 @@ export default function SurveyPage({
             </div>
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -1966,7 +1729,7 @@ export default function SurveyPage({
         const subfields = question.subfields;
         // Check for auto-calculated fields using validation rules
         const hasAutoCalculate = subfields.some(
-          (sf) => question.subfield_validations?.[sf]?.type === "auto_calculate"
+          sf => question.subfield_validations?.[sf]?.type === "auto_calculate"
         );
         return (
           <div>
@@ -1975,10 +1738,8 @@ export default function SurveyPage({
                 <thead>{/* No header row */}</thead>
                 <tbody>
                   {subfields.map((subfield, idx) => {
-                    const validation =
-                      question.subfield_validations?.[subfield];
-                    const isAutoCalculated =
-                      validation?.type === "auto_calculate";
+                    const validation = question.subfield_validations?.[subfield];
+                    const isAutoCalculated = validation?.type === "auto_calculate";
 
                     if (isAutoCalculated) {
                       // Calculate based on formula or default sum
@@ -1986,18 +1747,16 @@ export default function SurveyPage({
                       let calculatedValue = 0;
 
                       if (formula === "sum_all_previous") {
-                        calculatedValue = subfields
-                          .slice(0, idx)
-                          .reduce((sum, sf) => {
-                            const v =
-                              value &&
-                              typeof value === "object" &&
-                              !Array.isArray(value) &&
-                              value[sf] !== undefined
-                                ? value[sf]
-                                : 0;
-                            return sum + (typeof v === "number" ? v : 0);
-                          }, 0);
+                        calculatedValue = subfields.slice(0, idx).reduce((sum, sf) => {
+                          const v =
+                            value &&
+                            typeof value === "object" &&
+                            !Array.isArray(value) &&
+                            value[sf] !== undefined
+                              ? value[sf]
+                              : 0;
+                          return sum + (typeof v === "number" ? v : 0);
+                        }, 0);
                       }
 
                       return (
@@ -2028,16 +1787,16 @@ export default function SurveyPage({
                               validation?.type === "email"
                                 ? "email"
                                 : validation?.type?.includes("number")
-                                ? "number"
-                                : "text"
+                                  ? "number"
+                                  : "text"
                             }
                             className={inputClasses}
                             placeholder={
                               validation?.type === "email"
                                 ? `Enter email for ${subfield}`
                                 : validation?.type?.includes("number")
-                                ? `Enter Response`
-                                : `Enter ${subfield}`
+                                  ? `Enter Response`
+                                  : `Enter ${subfield}`
                             }
                             value={
                               value &&
@@ -2048,7 +1807,7 @@ export default function SurveyPage({
                                 ? String(value[subfield])
                                 : ""
                             }
-                            onChange={(e) => {
+                            onChange={e => {
                               const inputValue = e.target.value;
                               let processedValue: any;
 
@@ -2056,24 +1815,18 @@ export default function SurveyPage({
                                 processedValue = null;
                               } else if (validation?.type?.includes("number")) {
                                 processedValue = parseFloat(inputValue);
-                                if (isNaN(processedValue))
-                                  processedValue = null;
+                                if (isNaN(processedValue)) processedValue = null;
                               } else {
                                 processedValue = inputValue;
                               }
 
                               const prev =
-                                typeof value === "object" &&
-                                !Array.isArray(value) &&
-                                value
+                                typeof value === "object" && !Array.isArray(value) && value
                                   ? value
                                   : {};
-                              const filteredPrev: { [sub: string]: any } =
-                                Object.fromEntries(
-                                  Object.entries(prev).filter(
-                                    ([, v]) => v !== null && v !== ""
-                                  )
-                                );
+                              const filteredPrev: { [sub: string]: any } = Object.fromEntries(
+                                Object.entries(prev).filter(([, v]) => v !== null && v !== "")
+                              );
                               const next: { [sub: string]: any } = {
                                 ...filteredPrev,
                                 [subfield]: processedValue,
@@ -2081,46 +1834,33 @@ export default function SurveyPage({
                               // Only recalculate and include the total if hasAutoCalculate
                               if (hasAutoCalculate) {
                                 const totalField = subfields.find(
-                                  (sf) =>
-                                    question.subfield_validations?.[sf]
-                                      ?.type === "auto_calculate"
+                                  sf =>
+                                    question.subfield_validations?.[sf]?.type === "auto_calculate"
                                 );
                                 if (totalField) {
-                                  const totalFieldIndex =
-                                    subfields.indexOf(totalField);
+                                  const totalFieldIndex = subfields.indexOf(totalField);
                                   const total = subfields
                                     .slice(0, totalFieldIndex)
                                     .reduce((sum, sf) => {
                                       const v = next[sf];
-                                      return (
-                                        sum +
-                                        (typeof v === "number" && v !== null
-                                          ? v
-                                          : 0)
-                                      );
+                                      return sum + (typeof v === "number" && v !== null ? v : 0);
                                     }, 0);
                                   next[totalField] = total;
                                 }
                               }
                               handleResponseChange(question.id, next);
                             }}
-                            onBlur={(e) => {
+                            onBlur={e => {
                               const numValue =
-                                e.target.value === ""
-                                  ? null
-                                  : parseFloat(e.target.value);
+                                e.target.value === "" ? null : parseFloat(e.target.value);
                               const prev =
-                                typeof value === "object" &&
-                                !Array.isArray(value) &&
-                                value
+                                typeof value === "object" && !Array.isArray(value) && value
                                   ? value
                                   : {};
                               const filteredPrev: {
                                 [sub: string]: number | null;
                               } = Object.fromEntries(
-                                Object.entries(prev).filter(
-                                  ([, v]) => v !== null && v !== ""
-                                )
+                                Object.entries(prev).filter(([, v]) => v !== null && v !== "")
                               );
                               const next: { [sub: string]: number | null } = {
                                 ...filteredPrev,
@@ -2128,23 +1868,16 @@ export default function SurveyPage({
                               };
                               if (hasAutoCalculate) {
                                 const totalField = subfields.find(
-                                  (sf) =>
-                                    question.subfield_validations?.[sf]
-                                      ?.type === "auto_calculate"
+                                  sf =>
+                                    question.subfield_validations?.[sf]?.type === "auto_calculate"
                                 );
                                 if (totalField) {
-                                  const totalFieldIndex =
-                                    subfields.indexOf(totalField);
+                                  const totalFieldIndex = subfields.indexOf(totalField);
                                   const total = subfields
                                     .slice(0, totalFieldIndex)
                                     .reduce((sum, sf) => {
                                       const v = next[sf];
-                                      return (
-                                        sum +
-                                        (typeof v === "number" && v !== null
-                                          ? v
-                                          : 0)
-                                      );
+                                      return sum + (typeof v === "number" && v !== null ? v : 0);
                                     }, 0);
                                   next[totalField] = total;
                                 }
@@ -2152,12 +1885,10 @@ export default function SurveyPage({
                               handleBlur(
                                 question.id,
                                 next,
-                                question.secondary_type ||
-                                  question.question_type ||
-                                  "text"
+                                question.secondary_type || question.question_type || "text"
                               );
                             }}
-                            onWheel={(e) => e.currentTarget.blur()}
+                            onWheel={e => e.currentTarget.blur()}
                           />
                         </td>
                       </tr>
@@ -2168,11 +1899,7 @@ export default function SurveyPage({
             </div>
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -2196,16 +1923,10 @@ export default function SurveyPage({
 
         // Apply randomization if enabled
         const displayRows = question.randomize_rows
-          ? shuffleArrayWithSeed(
-              question.rows,
-              `${surveyId}-${question.id}-rows`
-            )
+          ? shuffleArrayWithSeed(question.rows, `${surveyId}-${question.id}-rows`)
           : question.rows;
         const displayColumns = question.randomize_columns
-          ? shuffleArrayWithSeed(
-              question.columns,
-              `${surveyId}-${question.id}-columns`
-            )
+          ? shuffleArrayWithSeed(question.columns, `${surveyId}-${question.id}-columns`)
           : question.columns;
 
         return (
@@ -2214,7 +1935,7 @@ export default function SurveyPage({
               <thead>
                 <tr>
                   <th className="px-4 py-2"></th>
-                  {displayColumns?.map((col) => (
+                  {displayColumns?.map(col => (
                     <th
                       key={col}
                       className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
@@ -2226,12 +1947,12 @@ export default function SurveyPage({
                 </tr>
               </thead>
               <tbody>
-                {displayRows.map((row) => (
+                {displayRows.map(row => (
                   <tr key={row}>
                     <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
                       {row}
                     </td>
-                    {displayColumns?.map((col) => (
+                    {displayColumns?.map(col => (
                       <td
                         key={col}
                         className="px-2 sm:px-4 py-2 text-center"
@@ -2256,11 +1977,7 @@ export default function SurveyPage({
             </table>
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -2285,16 +2002,10 @@ export default function SurveyPage({
 
         // Apply randomization if enabled
         const displayRows = question.randomize_rows
-          ? shuffleArrayWithSeed(
-              question.rows,
-              `${surveyId}-${question.id}-rows`
-            )
+          ? shuffleArrayWithSeed(question.rows, `${surveyId}-${question.id}-rows`)
           : question.rows;
         const displayColumns = question.randomize_columns
-          ? shuffleArrayWithSeed(
-              question.columns,
-              `${surveyId}-${question.id}-columns`
-            )
+          ? shuffleArrayWithSeed(question.columns, `${surveyId}-${question.id}-columns`)
           : question.columns;
 
         return (
@@ -2303,7 +2014,7 @@ export default function SurveyPage({
               <thead>
                 <tr>
                   <th className="px-4 py-2"></th>
-                  {displayColumns?.map((col) => (
+                  {displayColumns?.map(col => (
                     <th
                       key={col}
                       className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 text-center whitespace-normal"
@@ -2315,15 +2026,14 @@ export default function SurveyPage({
                 </tr>
               </thead>
               <tbody>
-                {displayRows.map((row) => (
+                {displayRows.map(row => (
                   <tr key={row}>
                     <td className="px-2 sm:px-4 py-2 text-gray-800 text-xs sm:text-sm font-medium">
                       {row}
                     </td>
-                    {displayColumns?.map((col) => {
+                    {displayColumns?.map(col => {
                       const isChecked =
-                        Array.isArray(matrixMultiValue[row]) &&
-                        matrixMultiValue[row].includes(col);
+                        Array.isArray(matrixMultiValue[row]) && matrixMultiValue[row].includes(col);
                       return (
                         <td
                           key={col}
@@ -2333,10 +2043,8 @@ export default function SurveyPage({
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={(e) => {
-                              const currentValues = Array.isArray(
-                                matrixMultiValue[row]
-                              )
+                            onChange={e => {
+                              const currentValues = Array.isArray(matrixMultiValue[row])
                                 ? matrixMultiValue[row]
                                 : [];
                               let newValues: string[];
@@ -2346,9 +2054,7 @@ export default function SurveyPage({
                                 newValues = [...currentValues, col];
                               } else {
                                 // Remove the column if unchecked
-                                newValues = currentValues.filter(
-                                  (v) => v !== col
-                                );
+                                newValues = currentValues.filter(v => v !== col);
                               }
 
                               const next = {
@@ -2368,11 +2074,7 @@ export default function SurveyPage({
             </table>
             {error && (
               <p className="text-red-500 text-sm mt-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -2398,19 +2100,16 @@ export default function SurveyPage({
     const sectionMap: { [section: string]: Question[] } = {};
     const sections: { title: string; questions: Question[] }[] = [];
     // Instead of grouping all 'Other' first, build sections in the order of sortedQuestions
-    sortedQuestions.forEach((q) => {
+    sortedQuestions.forEach(q => {
       const rawSection = q.section_title;
       const section =
-        rawSection && rawSection.trim() && rawSection.toLowerCase() !== "other"
-          ? rawSection
-          : null;
+        rawSection && rawSection.trim() && rawSection.toLowerCase() !== "other" ? rawSection : null;
       if (!section) {
         // Each question with no/empty/Other section_title gets its own section
         sections.push({ title: "Other", questions: [q] });
       } else {
         // If this is the first question in this section, create a new section in order
-        const lastSection =
-          sections.length > 0 ? sections[sections.length - 1] : null;
+        const lastSection = sections.length > 0 ? sections[sections.length - 1] : null;
         if (!lastSection || lastSection.title !== section) {
           sections.push({ title: section, questions: [q] });
         } else {
@@ -2429,9 +2128,7 @@ export default function SurveyPage({
   }
 
   // Build a flat, ordered array of all questions as they will be displayed
-  const orderedQuestions: Question[] = sections.flatMap(
-    (section) => section.questions
-  );
+  const orderedQuestions: Question[] = sections.flatMap(section => section.questions);
 
   const handleNextSection = async () => {
     console.log("handleNextSection", sessionId);
@@ -2475,16 +2172,8 @@ export default function SurveyPage({
                 };
               }
 
-              await apiService.savePartialResponse(
-                survey.id,
-                question.id,
-                answerToSave,
-                sessionId
-              );
-              console.log(
-                `Partial response saved for question ${question.id}:`,
-                answerToSave
-              );
+              await apiService.savePartialResponse(survey.id, question.id, answerToSave, sessionId);
+              console.log(`Partial response saved for question ${question.id}:`, answerToSave);
             } catch (error) {
               console.error("Failed to save partial response:", error);
               // Don't block the user flow if partial save fails
@@ -2505,24 +2194,24 @@ export default function SurveyPage({
       console.log("Saved survey progress to cookies:", progressData);
       displaySaveNotification();
 
-      setCurrentSectionIndex((prev) => prev + 1);
+      setCurrentSectionIndex(prev => prev + 1);
     }
   };
 
   const handlePreviousSection = () => {
     if (currentSectionIndex > 0) {
-      setCurrentSectionIndex((prev) => prev - 1);
+      setCurrentSectionIndex(prev => prev - 1);
     }
   };
 
-  const handleSectionSubmit = (e: React.FormEvent) => {
+  const handleSectionSubmit = (e: FormEvent) => {
     e.preventDefault();
     // Validate all questions in the current section
     const errors: ValidationErrors = {};
     let hasErrors = false;
     const currentSection = sections[currentSectionIndex];
     if (!currentSection) return;
-    currentSection.questions.forEach((question) => {
+    currentSection.questions.forEach(question => {
       const value = responses[question.id];
       const error = validateQuestion(
         question.id,
@@ -2551,9 +2240,7 @@ export default function SurveyPage({
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-6"></div>
-          <p className="text-gray-600 text-sm sm:text-lg font-medium">
-            Loading survey...
-          </p>
+          <p className="text-gray-600 text-sm sm:text-lg font-medium">Loading survey...</p>
         </div>
       </div>
     );
@@ -2568,8 +2255,8 @@ export default function SurveyPage({
             This survey has been closed
           </h2>
           <p className="text-gray-700 text-sm">
-            Thank you for your interest. Please contact the survey administrator
-            for further information.
+            Thank you for your interest. Please contact the survey administrator for further
+            information.
           </p>
         </div>
       </div>
@@ -2581,9 +2268,7 @@ export default function SurveyPage({
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="bg-white border border-red-200 rounded-xl p-8 max-w-md shadow-lg">
           <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-red-800 mb-2">
-            Survey Not Found
-          </h2>
+          <h2 className="text-xl font-semibold text-red-800 mb-2">Survey Not Found</h2>
           <p className="text-red-700 mb-4">{error}</p>
           <p className="text-gray-600 text-sm">
             Please check the survey link or contact the survey administrator.
@@ -2606,18 +2291,13 @@ export default function SurveyPage({
   if (submitted) {
     // Use custom thank you message if available, otherwise use default
     const thankYouMessage =
-      survey?.thank_you_message ||
-      "Your survey response has been submitted successfully.";
+      survey?.thank_you_message || "Your survey response has been submitted successfully.";
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-xl shadow-lg p-8 sm:p-12 max-w-2xl w-full text-center">
           <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg
-              className="w-10 h-10 text-white"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
+            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -2626,12 +2306,8 @@ export default function SurveyPage({
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Thank You!</h2>
-          <p className="text-gray-600 mb-6 whitespace-pre-line">
-            {thankYouMessage}
-          </p>
-          <p className="text-gray-500 text-sm">
-            You can now close this browser window.
-          </p>
+          <p className="text-gray-600 mb-6 whitespace-pre-line">{thankYouMessage}</p>
+          <p className="text-gray-500 text-sm">You can now close this browser window.</p>
         </div>
       </div>
     );
@@ -2641,8 +2317,7 @@ export default function SurveyPage({
     <div
       className="min-h-screen flex flex-col"
       style={{
-        background:
-          "linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #faf5ff 100%)",
+        background: "linear-gradient(135deg, #eef2ff 0%, #ffffff 50%, #faf5ff 100%)",
       }}
     >
       {/* Header removed per request */}
@@ -2713,17 +2388,14 @@ export default function SurveyPage({
                     Question {currentSectionIndex + 1} of {sections.length}
                   </span> */}
                   <span className="text-xs sm:text-base text-gray-500">
-                    {Math.round((currentSectionIndex / sections.length) * 100)}%
-                    Complete
+                    {Math.round((currentSectionIndex / sections.length) * 100)}% Complete
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all duration-300"
                     style={{
-                      width: `${
-                        (currentSectionIndex / sections.length) * 100
-                      }%`,
+                      width: `${(currentSectionIndex / sections.length) * 100}%`,
                     }}
                   ></div>
                 </div>
@@ -2734,32 +2406,25 @@ export default function SurveyPage({
             {sections.length > 0 && sections[currentSectionIndex] && (
               <form onSubmit={handleSectionSubmit}>
                 <div className="mb-8">
-                  {sections[currentSectionIndex].title.toLowerCase() !==
-                    "other" && (
+                  {sections[currentSectionIndex].title.toLowerCase() !== "other" && (
                     <h2 className="text-gray-600 text-xs sm:text-base mb-4 sm:mb-6 font-medium">
                       {sections[currentSectionIndex].title}
                     </h2>
                   )}
-                  {sections[currentSectionIndex].questions.map((question) => {
+                  {sections[currentSectionIndex].questions.map(question => {
                     // Find the index of this question in the flat, orderedQuestions array for continuous numbering
-                    const globalIdx = orderedQuestions.findIndex(
-                      (q) => q.id === question.id
-                    );
+                    const globalIdx = orderedQuestions.findIndex(q => q.id === question.id);
                     return (
                       <div key={question.id} className="mb-6 sm:mb-8 relative">
                         <div className="mb-3 sm:mb-4 flex flex-col items-start">
                           <h3 className="text-sm sm:text-lg font-semibold text-gray-900 leading-relaxed">
-                            <span className="text-gray-900 font-bold">
-                              {globalIdx + 1}.
-                            </span>{" "}
-                            {question.question_text
-                              .split("\n")
-                              .map((line, idx) => (
-                                <React.Fragment key={idx}>
-                                  {parseQuestionText(line)}
-                                  <br />
-                                </React.Fragment>
-                              ))}
+                            <span className="text-gray-900 font-bold">{globalIdx + 1}.</span>{" "}
+                            {question.question_text.split("\n").map((line, idx) => (
+                              <Fragment key={idx}>
+                                {parseQuestionText(line)}
+                                <br />
+                              </Fragment>
+                            ))}
                           </h3>
                           {question.is_required && (
                             <span className="inline-flex items-center mt-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -2773,8 +2438,7 @@ export default function SurveyPage({
                         {question.has_comment_box &&
                           (() => {
                             const currentResponse = responses[question.id];
-                            const triggerValue =
-                              question.comment_box_trigger_value;
+                            const triggerValue = question.comment_box_trigger_value;
 
                             // If trigger value is set, only show comment box when that value is selected
                             if (triggerValue) {
@@ -2792,8 +2456,7 @@ export default function SurveyPage({
 
                             // Determine if this should be an email field (if trigger value contains "email")
                             const isEmailField =
-                              triggerValue &&
-                              triggerValue.toLowerCase().includes("email");
+                              triggerValue && triggerValue.toLowerCase().includes("email");
 
                             return (
                               <div className="mt-4">
@@ -2807,24 +2470,13 @@ export default function SurveyPage({
                                     type="email"
                                     className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                                     placeholder="Enter your email address..."
-                                    value={
-                                      (responses[
-                                        `${question.id}_comment`
-                                      ] as string) || ""
-                                    }
+                                    value={(responses[`${question.id}_comment`] as string) || ""}
                                     maxLength={99999}
-                                    onChange={(e) =>
-                                      handleResponseChange(
-                                        `${question.id}_comment`,
-                                        e.target.value
-                                      )
+                                    onChange={e =>
+                                      handleResponseChange(`${question.id}_comment`, e.target.value)
                                     }
-                                    onBlur={(e) =>
-                                      handleBlur(
-                                        `${question.id}_comment`,
-                                        e.target.value,
-                                        "email"
-                                      )
+                                    onBlur={e =>
+                                      handleBlur(`${question.id}_comment`, e.target.value, "email")
                                     }
                                   />
                                 ) : (
@@ -2832,24 +2484,13 @@ export default function SurveyPage({
                                     className="w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 text-black transition-colors duration-200 text-xs sm:text-base border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                                     rows={question.comment_box_rows || 3}
                                     placeholder="Enter your comments..."
-                                    value={
-                                      (responses[
-                                        `${question.id}_comment`
-                                      ] as string) || ""
-                                    }
+                                    value={(responses[`${question.id}_comment`] as string) || ""}
                                     maxLength={99999}
-                                    onChange={(e) =>
-                                      handleResponseChange(
-                                        `${question.id}_comment`,
-                                        e.target.value
-                                      )
+                                    onChange={e =>
+                                      handleResponseChange(`${question.id}_comment`, e.target.value)
                                     }
-                                    onBlur={(e) =>
-                                      handleBlur(
-                                        `${question.id}_comment`,
-                                        e.target.value,
-                                        "text"
-                                      )
+                                    onBlur={e =>
+                                      handleBlur(`${question.id}_comment`, e.target.value, "text")
                                     }
                                   />
                                 )}
@@ -2877,8 +2518,8 @@ export default function SurveyPage({
                     {submitting && currentSectionIndex === sections.length - 1
                       ? "Submitting..."
                       : currentSectionIndex === sections.length - 1
-                      ? "Submit Survey"
-                      : "Save & Next"}
+                        ? "Submit Survey"
+                        : "Save & Next"}
                   </button>
                 </div>
               </form>

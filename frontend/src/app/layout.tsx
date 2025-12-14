@@ -16,15 +16,7 @@ export const metadata: Metadata = {
   title: "TSC Survey Platform",
   description:
     "Create, manage, and share professional surveys with ease. Collect valuable insights and feedback from your audience with our modern survey platform.",
-  keywords: [
-    "survey",
-    "questionnaire",
-    "feedback",
-    "data collection",
-    "research",
-    "poll",
-    "form",
-  ],
+  keywords: ["survey", "questionnaire", "feedback", "data collection", "research", "poll", "form"],
   authors: [{ name: "Survey Concierge Team" }],
   creator: "Survey Concierge",
   publisher: "Survey Concierge",
@@ -91,11 +83,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logos/TSC_Favicon.png?v=4" />
         <link rel="manifest" href="/manifest.json?v=4" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
     </html>
   );
 }

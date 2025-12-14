@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import {
-  apiService,
-  Survey as SurveyType,
-  Question,
-  optionUtils,
-} from "../lib/api";
+import { apiService, Survey as SurveyType, Question, optionUtils } from "../lib/api";
 
 interface SurveyProps {
   surveyId: string;
@@ -37,7 +32,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
     }
 
     const { options } = optionUtils.getOptionsWithSpecialHandling(question);
-    setRandomizedOptions((prev) => ({
+    setRandomizedOptions(prev => ({
       ...prev,
       [question.id]: options,
     }));
@@ -65,11 +60,8 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
     fetchSurvey();
   }, [surveyId]);
 
-  const handleResponseChange = (
-    questionId: number,
-    value: string | string[] | number
-  ) => {
-    setResponses((prev) => ({
+  const handleResponseChange = (questionId: number, value: string | string[] | number) => {
+    setResponses(prev => ({
       ...prev,
       [questionId]: value,
     }));
@@ -80,7 +72,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
     // Here you would typically send the responses to your backend
 
     // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     alert("Thank you for completing the survey!");
     onBack();
@@ -89,8 +81,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
 
   const renderQuestion = (question: Question) => {
     const value = responses[question.id];
-    const questionType =
-      question.secondary_type || question.question_type || "text";
+    const questionType = question.secondary_type || question.question_type || "text";
 
     switch (questionType) {
       case "text":
@@ -100,7 +91,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
             rows={1}
             placeholder="Enter your answer..."
             value={(value as string) || ""}
-            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+            onChange={e => handleResponseChange(question.id, e.target.value)}
           />
         );
 
@@ -111,7 +102,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
             rows={3}
             placeholder="Enter your answer..."
             value={(value as string) || ""}
-            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+            onChange={e => handleResponseChange(question.id, e.target.value)}
           />
         );
 
@@ -122,7 +113,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter your email..."
             value={(value as string) || ""}
-            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+            onChange={e => handleResponseChange(question.id, e.target.value)}
           />
         );
 
@@ -133,9 +124,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter a number..."
             value={(value as number) || ""}
-            onChange={(e) =>
-              handleResponseChange(question.id, parseInt(e.target.value) || 0)
-            }
+            onChange={e => handleResponseChange(question.id, parseInt(e.target.value) || 0)}
           />
         );
 
@@ -147,8 +136,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
         const randomizedOptions = getRandomizedOptions(question);
 
         // Standard layout for all multiple choice questions
-        const columns =
-          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+        const columns = optionUtils.organizeOptionsIntoColumns(randomizedOptions);
 
         if (columns.length === 1) {
           // Single row layout for better space utilization
@@ -164,9 +152,7 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
                     name={`question-${question.id}`}
                     value={option}
                     checked={value === option}
-                    onChange={(e) =>
-                      handleResponseChange(question.id, e.target.value)
-                    }
+                    onChange={e => handleResponseChange(question.id, e.target.value)}
                     className="text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-gray-700">{option}</span>
@@ -181,18 +167,13 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
               {columns.map((column, colIndex) => (
                 <div key={colIndex} className="space-y-2">
                   {column.map((option, index) => (
-                    <label
-                      key={index}
-                      className="flex items-center space-x-2 cursor-pointer"
-                    >
+                    <label key={index} className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="radio"
                         name={`question-${question.id}`}
                         value={option}
                         checked={value === option}
-                        onChange={(e) =>
-                          handleResponseChange(question.id, e.target.value)
-                        }
+                        onChange={e => handleResponseChange(question.id, e.target.value)}
                         className="text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-gray-700">{option}</span>
@@ -209,19 +190,16 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
         return (
           <div className="space-y-2">
             {question.options?.map((option, index) => (
-              <label
-                key={index}
-                className="flex items-center space-x-2 cursor-pointer"
-              >
+              <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
                   value={option}
                   checked={Array.isArray(value) && value.includes(option)}
-                  onChange={(e) => {
+                  onChange={e => {
                     const currentValues = Array.isArray(value) ? value : [];
                     const newValues = e.target.checked
                       ? [...currentValues, option]
-                      : currentValues.filter((v) => v !== option);
+                      : currentValues.filter(v => v !== option);
                     handleResponseChange(question.id, newValues);
                   }}
                   className="text-blue-600 focus:ring-blue-500"
@@ -283,32 +261,23 @@ export default function Survey({ surveyId, onBack }: SurveyProps) {
           ← Back to Surveys
         </button>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {survey.title}
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{survey.title}</h1>
         <p className="text-gray-600 mb-6">{survey.description}</p>
       </div>
 
       <form
-        onSubmit={(e) => {
+        onSubmit={e => {
           e.preventDefault();
           handleSubmit();
         }}
         className="space-y-8"
       >
         {survey.questions.map((question, index) => (
-          <div
-            key={question.id}
-            className="bg-white border border-gray-200 rounded-lg p-6"
-          >
+          <div key={question.id} className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="mb-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Question {index + 1}
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Question {index + 1}</h3>
               <p className="text-gray-700 mb-2">{question.question_text}</p>
-              {question.is_required && (
-                <span className="text-red-500 text-sm">* Required</span>
-              )}
+              {question.is_required && <span className="text-red-500 text-sm">* Required</span>}
             </div>
 
             <div className="mt-4">{renderQuestion(question)}</div>
