@@ -2191,7 +2191,6 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         sessionId: sessionId, // Include session ID for partial response tracking
       };
       cookieUtils.saveSurveyProgress(surveyId, progressData);
-      console.log("Saved survey progress to cookies:", progressData);
       displaySaveNotification();
 
       setCurrentSectionIndex(prev => prev + 1);
