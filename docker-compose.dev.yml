@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: survey_postgres_dev
+    environment:
+      POSTGRES_DB: survey_db
+      POSTGRES_USER: survey_user
+      POSTGRES_PASSWORD: survey_password
+    ports:
+      - "5485:5432"
+    volumes:
+      - ./.docker-data/postgres:/var/lib/postgresql/data
+    expose:
+      - "5485"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: survey_backend_dev
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=postgresql://survey_user:survey_password@postgres:5432/survey_db
+      - USE_X_FORWARDED_HOST=True
+      - USE_X_FORWARDED_PORT=True
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: survey_frontend_dev
+    ports:
+      - "4545:4545"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped

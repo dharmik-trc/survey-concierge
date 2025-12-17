@@ -1,0 +1,330 @@
+"use client";
+
+import { useState, useEffect, useRef, useMemo } from "react";
+import {
+  apiService,
+  Survey as SurveyType,
+  Question,
+  optionUtils,
+} from "../lib/api";
+
+interface SurveyProps {
+  surveyId: string;
+  onBack: () => void;
+}
+
+interface SurveyResponse {
+  [questionId: number]: string | string[] | number;
+}
+
+export default function Survey({ surveyId, onBack }: SurveyProps) {
+  const [survey, setSurvey] = useState<SurveyType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [responses, setResponses] = useState<SurveyResponse>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [randomizedOptions, setRandomizedOptions] = useState<{
+    [questionId: number]: string[];
+  }>({});
+
+  // Use ref to prevent duplicate requests
+  const hasRequested = useRef(false);
+
+  // Function to get or create randomized options for a question
+  const getRandomizedOptions = (question: Question): string[] => {
+    if (randomizedOptions[question.id]) {
+      return randomizedOptions[question.id];
+    }
+
+    const { options } = optionUtils.getOptionsWithSpecialHandling(question);
+    setRandomizedOptions((prev) => ({
+      ...prev,
+      [question.id]: options,
+    }));
+    return options;
+  };
+
+  useEffect(() => {
+    // Only make request if we haven't already
+    if (hasRequested.current) return;
+    hasRequested.current = true;
+
+    const fetchSurvey = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await apiService.getSurvey(surveyId);
+        setSurvey(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch survey");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSurvey();
+  }, [surveyId]);
+
+  const handleResponseChange = (
+    questionId: number,
+    value: string | string[] | number
+  ) => {
+    setResponses((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    // Here you would typically send the responses to your backend
+
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    alert("Thank you for completing the survey!");
+    onBack();
+    setSubmitting(false);
+  };
+
+  const renderQuestion = (question: Question) => {
+    const value = responses[question.id];
+    const questionType =
+      question.secondary_type || question.question_type || "text";
+
+    switch (questionType) {
+      case "text":
+        return (
+          <textarea
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={1}
+            placeholder="Enter your answer..."
+            value={(value as string) || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+          />
+        );
+
+      case "paragraph":
+        return (
+          <textarea
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+            placeholder="Enter your answer..."
+            value={(value as string) || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+          />
+        );
+
+      case "email":
+        return (
+          <input
+            type="email"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your email..."
+            value={(value as string) || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+          />
+        );
+
+      case "number":
+        return (
+          <input
+            type="number"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter a number..."
+            value={(value as number) || ""}
+            onChange={(e) =>
+              handleResponseChange(question.id, parseInt(e.target.value) || 0)
+            }
+          />
+        );
+
+      case "multiple_choices":
+      case "radio":
+      case "dropdown":
+      case "yes_no":
+        // Get randomized options with special handling - only randomize once
+        const randomizedOptions = getRandomizedOptions(question);
+
+        // Standard layout for all multiple choice questions
+        const columns =
+          optionUtils.organizeOptionsIntoColumns(randomizedOptions);
+
+        if (columns.length === 1) {
+          // Single row layout for better space utilization
+          return (
+            <div className="flex gap-4 flex-wrap">
+              {columns[0].map((option, index) => (
+                <label
+                  key={index}
+                  className="flex items-center space-x-2 cursor-pointer px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={option}
+                    checked={value === option}
+                    onChange={(e) =>
+                      handleResponseChange(question.id, e.target.value)
+                    }
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          );
+        } else {
+          // Multi-column layout
+          return (
+            <div className="grid grid-cols-2 gap-4">
+              {columns.map((column, colIndex) => (
+                <div key={colIndex} className="space-y-2">
+                  {column.map((option, index) => (
+                    <label
+                      key={index}
+                      className="flex items-center space-x-2 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name={`question-${question.id}`}
+                        value={option}
+                        checked={value === option}
+                        onChange={(e) =>
+                          handleResponseChange(question.id, e.target.value)
+                        }
+                        className="text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-700">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        break;
+
+      case "fields":
+        return (
+          <div className="space-y-2">
+            {question.options?.map((option, index) => (
+              <label
+                key={index}
+                className="flex items-center space-x-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  value={option}
+                  checked={Array.isArray(value) && value.includes(option)}
+                  onChange={(e) => {
+                    const currentValues = Array.isArray(value) ? value : [];
+                    const newValues = e.target.checked
+                      ? [...currentValues, option]
+                      : currentValues.filter((v) => v !== option);
+                    handleResponseChange(question.id, newValues);
+                  }}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-700">{option}</span>
+              </label>
+            ))}
+          </div>
+        );
+
+      default:
+        return <p className="text-gray-500">Unsupported question type</p>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800">Error: {error}</p>
+        <button
+          onClick={onBack}
+          className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  if (!survey) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">Survey not found.</p>
+        <button
+          onClick={onBack}
+          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <button
+          onClick={onBack}
+          className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
+        >
+          ← Back to Surveys
+        </button>
+
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          {survey.title}
+        </h1>
+        <p className="text-gray-600 mb-6">{survey.description}</p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+        className="space-y-8"
+      >
+        {survey.questions.map((question, index) => (
+          <div
+            key={question.id}
+            className="bg-white border border-gray-200 rounded-lg p-6"
+          >
+            <div className="mb-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Question {index + 1}
+              </h3>
+              <p className="text-gray-700 mb-2">{question.question_text}</p>
+              {question.is_required && (
+                <span className="text-red-500 text-sm">* Required</span>
+              )}
+            </div>
+
+            <div className="mt-4">{renderQuestion(question)}</div>
+          </div>
+        ))}
+
+        <div className="flex justify-end pt-6">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting..." : "Submit Survey"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

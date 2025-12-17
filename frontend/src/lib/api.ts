@@ -1,0 +1,686 @@
+// API service for communicating with Django backend
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:9000/api/survey";
+
+export interface Question {
+  id: number;
+  question_text: string;
+  primary_type: string;
+  secondary_type: string;
+  // Backward compatibility - will be removed later
+  question_type?: string;
+  is_required: boolean;
+  order: number;
+  randomize_options: boolean;
+  has_none_option: boolean;
+  none_option_text?: string | null;
+  has_other_option: boolean;
+  exclusive_column?: string | null;
+  randomize_rows: boolean;
+  randomize_columns: boolean;
+  has_comment_box: boolean;
+  comment_box_rows: number;
+  comment_box_label?: string | null;
+  comment_box_trigger_value?: string | null;
+  store_on_next: boolean;
+  row_count: number;
+  // Slider/Scale fields
+  scale_min: number;
+  scale_max: number;
+  scale_step: number;
+  scale_min_label?: string | null;
+  scale_max_label?: string | null;
+  options?: string[];
+  section_title?: string | null;
+  subfields?: string[];
+  subfield_validations?: {
+    [fieldName: string]: {
+      type:
+        | "positive_number"
+        | "negative_number"
+        | "all_numbers"
+        | "email"
+        | "text"
+        | "auto_calculate";
+      required?: boolean;
+      formula?: string; // For auto-calculated fields like "Total"
+    };
+  };
+  rows?: string[];
+  columns?: string[];
+}
+
+export interface Survey {
+  id: string;
+  title: string;
+  description: string;
+  logo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  store_basic_details: boolean;
+  thank_you_message?: string | null;
+  questions: Question[];
+}
+
+export interface SurveyListItem {
+  id: string;
+  title: string;
+  description: string;
+  created_at: string;
+  question_count: number;
+  is_active: boolean;
+  // Added counts from backend
+  partial_responses?: number;
+  completed_responses?: number;
+  all_responses?: number;
+}
+
+export interface SurveyResponse {
+  [questionId: string]:
+    | string
+    | number
+    | string[]
+    | null
+    | { [subfield: string]: number | null }
+    | { [row: string]: string }
+    | { [row: string]: string[] };
+}
+
+export interface SubmitResponse {
+  message: string;
+  response_id: string;
+}
+
+class ApiService {
+  private async request<T>(
+    endpoint: string,
+    options?: RequestInit
+  ): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  }
+
+  // Get list of all surveys
+  async getSurveys(options?: {
+    includeInactive?: boolean;
+    signal?: AbortSignal;
+  }): Promise<SurveyListItem[]> {
+    const params = new URLSearchParams();
+    if (options?.includeInactive) params.set("include_inactive", "true");
+    const qs = params.toString();
+    const endpoint = `/surveys/${qs ? `?${qs}` : ""}`;
+    return this.request<SurveyListItem[]>(endpoint, {
+      signal: options?.signal,
+    });
+  }
+
+  // Get a specific survey with all its questions
+  async getSurvey(surveyId: string, signal?: AbortSignal): Promise<Survey> {
+    return this.request<Survey>(`/surveys/${surveyId}/`, { signal });
+  }
+
+  // Get survey meta, including inactive (minimal fields when inactive)
+  async getSurveyMeta(
+    surveyId: string,
+    signal?: AbortSignal
+  ): Promise<
+    | { id: string; title: string; description: string; is_active: boolean }
+    | Survey
+  > {
+    return this.request(`/surveys/${surveyId}/?include_inactive=true`, {
+      signal,
+    });
+  }
+
+  // Get all questions for a specific survey
+  async getSurveyQuestions(
+    surveyId: string,
+    options?: { includeInactive?: boolean; signal?: AbortSignal }
+  ): Promise<Question[]> {
+    const params = new URLSearchParams();
+    if (options?.includeInactive) {
+      params.append("include_inactive", "true");
+    }
+    const queryString = params.toString();
+    const url = `/surveys/${surveyId}/questions/${
+      queryString ? `?${queryString}` : ""
+    }`;
+    return this.request<Question[]>(url, {
+      signal: options?.signal,
+    });
+  }
+
+  // Get a specific question
+  async getQuestion(
+    surveyId: string,
+    questionId: number,
+    signal?: AbortSignal
+  ): Promise<Question> {
+    return this.request<Question>(
+      `/surveys/${surveyId}/questions/${questionId}/`,
+      { signal }
+    );
+  }
+
+  // Submit survey responses
+  async submitSurveyResponse(
+    surveyId: string,
+    responses: SurveyResponse,
+    sessionId?: string
+  ): Promise<SubmitResponse> {
+    return this.request<SubmitResponse>(`/surveys/${surveyId}/submit/`, {
+      method: "POST",
+      body: JSON.stringify({ responses, session_id: sessionId }),
+    });
+  }
+
+  // Save partial response when user clicks Next
+  async savePartialResponse(
+    surveyId: string,
+    questionId: number,
+    answer: any,
+    sessionId?: string
+  ): Promise<{
+    message: string;
+    response_id: string;
+    question_id: number;
+    answer: any;
+    session_id: string;
+  }> {
+    return this.request<{
+      message: string;
+      response_id: string;
+      question_id: number;
+      answer: any;
+      session_id: string;
+    }>(`/surveys/${surveyId}/questions/${questionId}/save-partial/`, {
+      method: "POST",
+      body: JSON.stringify({ answer, session_id: sessionId }),
+    });
+  }
+
+  // Export all survey responses as Excel file (includes partial, completed, and all responses in separate tabs)
+  async exportSurveyResponses(surveyId: string): Promise<void> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/responses/export/`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to export responses: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // Get the blob and create a download link
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from Content-Disposition header or use default with timestamp
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    // Fallback filename with human-readable date/time
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    let filename = `Survey_Export_${dateStr}_${timeStr}.xlsx`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
+  // Export analytics for a survey as Excel file
+  async exportAnalytics(surveyId: string): Promise<void> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/export/`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to export analytics: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // Get the blob and create a download link
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from Content-Disposition header or use default with timestamp
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    // Fallback filename with human-readable date/time
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    let filename = `Survey_Analytics_${dateStr}_${timeStr}.xlsx`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
+  // Export filtered analytics (supports multiple filters with AND logic)
+  async exportFilteredAnalytics(
+    surveyId: string,
+    filters: Array<{
+      question_id: number;
+      selected_options?: string[];
+      numeric_range?: [number | null, number | null];
+    }>,
+    excludeOpenText?: boolean
+  ): Promise<void> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/export-filtered/`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filters: filters,
+        exclude_open_text: excludeOpenText || false,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Failed to export filtered analytics: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error || errorData.message) {
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        }
+      } catch {
+        // If JSON parsing fails, use default message
+      }
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      throw error;
+    }
+
+    // Get the blob and create a download link
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from Content-Disposition header or use default with timestamp
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    // Fallback filename with human-readable date/time
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    let filename = `Survey_Filtered_Analytics_${dateStr}_${timeStr}.xlsx`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
+  // Preview filtered analytics (returns JSON data for real-time preview, supports multiple filters)
+  async previewFilteredAnalytics(
+    surveyId: string,
+    filters: Array<{
+      question_id: number;
+      selected_options?: string[];
+      numeric_range?: [number | null, number | null];
+    }>,
+    excludeOpenText?: boolean
+  ): Promise<{
+    filtered_count: number;
+    total_count: number;
+    filters?: Array<{
+      filter_question: string;
+      selected_options?: string[];
+      numeric_range?: string;
+    }>;
+    filter_question?: string;
+    selected_options?: string[];
+    preview_data: Array<{
+      question_id: number;
+      question_text: string;
+      question_order: number;
+      question_type: string;
+      answered: number;
+      skipped: number;
+      total: number;
+      top_options?: Array<{
+        option: string;
+        count: number;
+        percentage: number;
+      }>;
+      avg?: number;
+      min?: number;
+      max?: number;
+      subfield_count?: number;
+    }>;
+    total_questions: number;
+    showing_questions: number;
+    exclude_open_text?: boolean;
+    message?: string;
+  }> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/preview-filtered/`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filters: filters,
+        exclude_open_text: excludeOpenText || false,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Failed to preview filtered analytics: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error || errorData.message) {
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        }
+      } catch {
+        // If JSON parsing fails, use default message
+      }
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  // Export segmented analytics (all segments side-by-side)
+  async exportSegmentedAnalytics(
+    surveyId: string,
+    dimensions: Array<{
+      name?: string;
+      question_id: number;
+      type: "numeric_range" | "choice_mapping";
+      ranges?: { [segmentName: string]: [number | null, number | null] };
+      mapping?: { [rawAnswer: string]: string };
+    }>
+  ): Promise<void> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/export-segmented/`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        dimensions: dimensions,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Failed to export segmented analytics: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error || errorData.message) {
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        }
+      } catch {
+        // If JSON parsing fails, use default message
+      }
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      throw error;
+    }
+
+    // Get the blob and create a download link
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+
+    // Extract filename from Content-Disposition header or use default with timestamp
+    const contentDisposition = response.headers.get("Content-Disposition");
+
+    // Fallback filename with human-readable date/time
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    let filename = `Survey_Segmented_Analytics_${dateStr}_${timeStr}.xlsx`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
+  // Preview segmented analytics (returns JSON data for real-time preview)
+  async previewSegmentedAnalytics(
+    surveyId: string,
+    dimensions: Array<{
+      name?: string;
+      question_id: number;
+      type: "numeric_range" | "choice_mapping";
+      ranges?: { [segmentName: string]: [number | null, number | null] };
+      mapping?: { [rawAnswer: string]: string };
+    }>
+  ): Promise<{
+    segments: { [segmentName: string]: { count: number } };
+    segment_order: string[];
+    preview_data: Array<{
+      question_id: number;
+      question_text: string;
+      question_order: number;
+      question_type: string;
+      segments: {
+        [segmentName: string]: {
+          answered: number;
+          skipped: number;
+          total: number;
+          top_options?: Array<{
+            option: string;
+            count: number;
+            percentage: number;
+          }>;
+          avg?: number;
+          min?: number;
+          max?: number;
+          subfield_count?: number;
+        };
+      };
+    }>;
+    total_questions: number;
+    showing_questions: number;
+    message?: string;
+  }> {
+    const url = `${API_BASE_URL}/surveys/${surveyId}/analytics/preview-segmented/`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        dimensions: dimensions,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Failed to preview segmented analytics: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error || errorData.message) {
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        }
+      } catch {
+        // If JSON parsing fails, use default message
+      }
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      throw error;
+    }
+
+    return response.json();
+  }
+}
+
+export const apiService = new ApiService();
+
+// Constants for special options
+export const OTHER_OPTION = "Other, please specify";
+export const DEFAULT_NONE_OPTION = "None of the above";
+
+// Simplified utility functions for option handling
+// Simple shuffle function for consistent randomization (same as in survey page)
+const shuffleWithSeed = <T>(array: T[], seed: string): T[] => {
+  return [...array].sort((a, b) => {
+    const getHash = (item: T) => {
+      const str = seed + String(item);
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash += str.charCodeAt(i);
+      }
+      return hash;
+    };
+    return getHash(a) - getHash(b);
+  });
+};
+
+export const optionUtils = {
+  /**
+   * Get options with proper hierarchy: regular options (randomized if needed) + Other + None of the Above
+   */
+  getOptionsWithSpecialHandling: (
+    question: Question,
+    surveyId?: string
+  ): { options: string[]; hasOtherOption: boolean; hasNoneOption: boolean } => {
+    const baseOptions = question.options || [];
+
+    // If randomization is enabled, randomize only the base options
+    let processedOptions = [...baseOptions];
+    if (question.randomize_options && baseOptions.length > 0) {
+      // Use seeded randomization for consistent results per user
+      const seed = surveyId
+        ? `${surveyId}-${question.id}-options`
+        : `${question.id}-options`;
+      processedOptions = shuffleWithSeed(baseOptions, seed);
+    }
+
+    // Build final options array with proper hierarchy
+    const finalOptions = [...processedOptions];
+
+    // Add "Other (please specify)" if enabled
+    if (question.has_other_option) {
+      finalOptions.push(OTHER_OPTION);
+    }
+
+    // Add "None of the Above" if enabled (always last)
+    if (question.has_none_option) {
+      const noneText = question.none_option_text || DEFAULT_NONE_OPTION;
+      finalOptions.push(noneText);
+    }
+
+    return {
+      options: finalOptions,
+      hasOtherOption: question.has_other_option,
+      hasNoneOption: question.has_none_option,
+    };
+  },
+
+  /**
+   * Legacy function for backward compatibility
+   */
+  getRandomizedOptions: (
+    options: string[],
+    shouldRandomize: boolean = false,
+    seed: string = "default-seed"
+  ): string[] => {
+    if (!options || options.length === 0) return options;
+
+    // If randomization is disabled, return original order
+    if (!shouldRandomize) {
+      return [...options];
+    }
+
+    // Use seeded randomization for consistency
+    return shuffleWithSeed(options, seed);
+  },
+
+  /**
+   * Simple check for exclusive options
+   */
+  isExclusiveOption: (option: string): boolean => {
+    return (
+      option.toLowerCase().includes("don't know") ||
+      option.toLowerCase().includes("none")
+    );
+  },
+
+  /**
+   * Check if a question should be rendered as a scale
+   */
+  shouldRenderAsScale: (question: Question): boolean => {
+    // Scale questions are no longer supported in the current QUESTION_HIERARCHY
+    return false;
+  },
+
+  /**
+   * Organize options into columns (up to 6 per column, balanced when splitting)
+   */
+  organizeOptionsIntoColumns: (
+    options: string[],
+    maxPerColumn: number = 6
+  ): string[][] => {
+    if (options.length <= maxPerColumn) {
+      return [options]; // Single column for 6 or fewer options
+    }
+
+    // For 7 or more options, split into 2 balanced columns
+    const midPoint = Math.ceil(options.length / 2);
+    return [options.slice(0, midPoint), options.slice(midPoint)];
+  },
+};

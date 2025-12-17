@@ -1,0 +1,50 @@
+{
+  "name": "survey-concierge-frontend",
+  "version": "1.0.0",
+  "description": "Survey Concierge - Professional Survey Platform Frontend",
+  "private": true,
+  "author": "Survey Concierge Team",
+  "license": "MIT",
+  "homepage": "http://localhost:3000",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/survey-concierge/platform.git"
+  },
+  "keywords": [
+    "survey",
+    "questionnaire",
+    "feedback",
+    "data-collection",
+    "research",
+    "poll",
+    "form",
+    "nextjs",
+    "react",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "15.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
