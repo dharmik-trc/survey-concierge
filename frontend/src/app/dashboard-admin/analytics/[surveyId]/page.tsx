@@ -13,7 +13,9 @@ export default function AnalyticsPage() {
   const [surveyQuestions, setSurveyQuestions] = useState<Question[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [surveyTitle, setSurveyTitle] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"filter" | "segmentation">("filter");
+  const [activeTab, setActiveTab] = useState<"filter" | "segmentation">(
+    "filter"
+  );
 
   // Filter state
   const [filterConfigs, setFilterConfigs] = useState<
@@ -21,7 +23,7 @@ export default function AnalyticsPage() {
       questionId: string;
       selectedOptions?: string[];
       numericRange?: [number | null, number | null];
-      filterType?: "choice" | "numeric";
+      filterType?: 'choice' | 'numeric';
     }>
   >([]);
   const [excludeOpenText, setExcludeOpenText] = useState(false);
@@ -51,7 +53,7 @@ export default function AnalyticsPage() {
       setLoadingQuestions(true);
       try {
         const surveys = await apiService.getSurveys({ includeInactive: true });
-        const survey = surveys.find(s => s.id === surveyId);
+        const survey = surveys.find((s) => s.id === surveyId);
         if (survey) {
           setSurveyTitle(survey.title);
         }
@@ -59,6 +61,7 @@ export default function AnalyticsPage() {
         const questions = await apiService.getSurveyQuestions(surveyId, {
           includeInactive: true,
         });
+        console.log("DEBUG: Loaded questions with orders:", questions.map(q => ({ id: q.id, order: q.order, sequential: questions.indexOf(q) + 1 })));
         setSurveyQuestions(questions);
       } catch (err) {
         console.error("Failed to load survey data:", err);
@@ -78,7 +81,7 @@ export default function AnalyticsPage() {
     if (
       activeTab !== "filter" ||
       filterConfigs.length === 0 ||
-      filterConfigs.some(f => {
+      filterConfigs.some((f) => {
         if (!f.questionId) return true;
         if (f.filterType === "numeric") {
           return !f.numericRange;
@@ -98,11 +101,11 @@ export default function AnalyticsPage() {
     setLoadingFilterPreview(true);
     filterPreviewTimeoutRef.current = setTimeout(async () => {
       try {
-        const filters = filterConfigs.map(f => {
+        const filters = filterConfigs.map((f) => {
           const filter: any = {
             question_id: parseInt(f.questionId),
           };
-          if (f.filterType === "numeric" && f.numericRange) {
+          if (f.filterType === 'numeric' && f.numericRange) {
             filter.numeric_range = f.numericRange;
           } else if (f.selectedOptions) {
             filter.selected_options = f.selectedOptions;
@@ -139,10 +142,12 @@ export default function AnalyticsPage() {
 
     // Check if all dimensions are valid
     const isValid = segmentationDimensions.every(
-      d =>
+      (d) =>
         d.question_id > 0 &&
-        ((d.type === "choice_mapping" && Object.keys(d.mapping || {}).length > 0) ||
-          (d.type === "numeric_range" && Object.keys(d.ranges || {}).length > 0))
+        ((d.type === "choice_mapping" &&
+          Object.keys(d.mapping || {}).length > 0) ||
+          (d.type === "numeric_range" &&
+            Object.keys(d.ranges || {}).length > 0))
     );
 
     if (!isValid) {
@@ -158,14 +163,17 @@ export default function AnalyticsPage() {
     setLoadingPreview(true);
     previewTimeoutRef.current = setTimeout(async () => {
       try {
-        const dimensions = segmentationDimensions.map(d => ({
+        const dimensions = segmentationDimensions.map((d) => ({
           name: d.name || `Dimension ${segmentationDimensions.indexOf(d) + 1}`,
           question_id: d.question_id,
           type: d.type,
           ranges: d.ranges,
           mapping: d.mapping,
         }));
-        const preview = await apiService.previewSegmentedAnalytics(surveyId, dimensions);
+        const preview = await apiService.previewSegmentedAnalytics(
+          surveyId,
+          dimensions
+        );
         setPreviewData(preview);
       } catch (err) {
         console.error("Failed to load segmentation preview:", err);
@@ -185,24 +193,26 @@ export default function AnalyticsPage() {
   const exportFiltered = async () => {
     if (
       filterConfigs.length === 0 ||
-      filterConfigs.some(f => {
+      filterConfigs.some((f) => {
         if (!f.questionId) return true;
-        if (f.filterType === "numeric") {
+        if (f.filterType === 'numeric') {
           return !f.numericRange;
         }
         return !f.selectedOptions || f.selectedOptions.length === 0;
       })
     ) {
-      alert("Please add at least one filter with a question and valid filter criteria");
+      alert(
+        "Please add at least one filter with a question and valid filter criteria"
+      );
       return;
     }
     try {
       setGeneratingFiltered(true);
-      const filters = filterConfigs.map(f => {
+      const filters = filterConfigs.map((f) => {
         const filter: any = {
           question_id: parseInt(f.questionId),
         };
-        if (f.filterType === "numeric" && f.numericRange) {
+        if (f.filterType === 'numeric' && f.numericRange) {
           filter.numeric_range = f.numericRange;
         } else if (f.selectedOptions) {
           filter.selected_options = f.selectedOptions;
@@ -212,7 +222,10 @@ export default function AnalyticsPage() {
       await apiService.exportFilteredAnalytics(surveyId, filters, excludeOpenText);
     } catch (err: any) {
       console.error("Failed to export filtered analytics:", err);
-      alert("Failed to export filtered analytics: " + (err.message || "Unknown error"));
+      alert(
+        "Failed to export filtered analytics: " +
+          (err.message || "Unknown error")
+      );
     } finally {
       setGeneratingFiltered(false);
     }
@@ -222,10 +235,12 @@ export default function AnalyticsPage() {
     if (
       segmentationDimensions.length === 0 ||
       segmentationDimensions.some(
-        d =>
+        (d) =>
           d.question_id === 0 ||
-          (d.type === "choice_mapping" && Object.keys(d.mapping || {}).length === 0) ||
-          (d.type === "numeric_range" && Object.keys(d.ranges || {}).length === 0)
+          (d.type === "choice_mapping" &&
+            Object.keys(d.mapping || {}).length === 0) ||
+          (d.type === "numeric_range" &&
+            Object.keys(d.ranges || {}).length === 0)
       )
     ) {
       alert("Please add at least one valid dimension with segments defined");
@@ -233,7 +248,7 @@ export default function AnalyticsPage() {
     }
     try {
       setGeneratingSegmented(true);
-      const dimensions = segmentationDimensions.map(d => ({
+      const dimensions = segmentationDimensions.map((d) => ({
         name: d.name || `Dimension ${segmentationDimensions.indexOf(d) + 1}`,
         question_id: d.question_id,
         type: d.type,
@@ -243,7 +258,10 @@ export default function AnalyticsPage() {
       await apiService.exportSegmentedAnalytics(surveyId, dimensions);
     } catch (err: any) {
       console.error("Failed to export segmented analytics:", err);
-      alert("Failed to export segmented analytics: " + (err.message || "Unknown error"));
+      alert(
+        "Failed to export segmented analytics: " +
+          (err.message || "Unknown error")
+      );
     } finally {
       setGeneratingSegmented(false);
     }
@@ -257,8 +275,12 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between h-24">
             <div className="flex items-center gap-4">
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Analytics Dashboard</h1>
-                {surveyTitle && <p className="text-sm text-gray-600">{surveyTitle}</p>}
+                <h1 className="text-xl font-bold text-gray-900">
+                  Analytics Dashboard
+                </h1>
+                {surveyTitle && (
+                  <p className="text-sm text-gray-600">{surveyTitle}</p>
+                )}
               </div>
             </div>
             <ConciergeLogo size="sm" />
@@ -268,171 +290,206 @@ export default function AnalyticsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Live Preview Section - At Top */}
-        {activeTab === "filter" && filterPreviewData && !loadingFilterPreview && (
-          <div className="mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Live Preview</h3>
+        {activeTab === "filter" &&
+          filterPreviewData &&
+          !loadingFilterPreview && (
+            <div className="mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                📊 Live Preview
+              </h3>
 
-            {/* Filter Summary */}
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Filter Summary</h4>
-              <div className="space-y-2">
-                {filterPreviewData.filters?.map((filter: any, idx: number) => (
-                  <div key={idx} className="pb-2 border-b border-gray-200 last:border-b-0">
-                    <div className="text-sm">
-                      <span className="text-gray-600">Filter {idx + 1}:</span>{" "}
-                      <span className="font-medium text-gray-900">{filter.filter_question}</span>
-                    </div>
-                    {filter.selected_options && (
-                      <div className="text-sm">
-                        <span className="text-gray-600">Options:</span>{" "}
-                        <span className="text-gray-900">{filter.selected_options.join(", ")}</span>
+              {/* Filter Summary */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                  Filter Summary
+                </h4>
+                <div className="space-y-2">
+                  {filterPreviewData.filters?.map(
+                    (filter: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="pb-2 border-b border-gray-200 last:border-b-0"
+                      >
+                        <div className="text-sm">
+                          <span className="text-gray-600">
+                            Filter {idx + 1}:
+                          </span>{" "}
+                          <span className="font-medium text-gray-900">
+                            {filter.filter_question}
+                          </span>
+                        </div>
+                        {filter.selected_options && (
+                          <div className="text-sm">
+                            <span className="text-gray-600">Options:</span>{" "}
+                            <span className="text-gray-900">
+                              {filter.selected_options.join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        {filter.numeric_range && (
+                          <div className="text-sm">
+                            <span className="text-gray-600">Range:</span>{" "}
+                            <span className="text-gray-900">
+                              {filter.numeric_range}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {filter.numeric_range && (
-                      <div className="text-sm">
-                        <span className="text-gray-600">Range:</span>{" "}
-                        <span className="text-gray-900">{filter.numeric_range}</span>
-                      </div>
-                    )}
-                  </div>
-                )) || (
-                  <div>
-                    <span className="text-sm text-gray-600">Filter Question:</span>{" "}
-                    <span className="text-sm font-medium text-gray-900">
-                      {filterPreviewData.filter_question}
-                    </span>
-                  </div>
-                )}
-                {filterPreviewData.selected_options && (
-                  <div>
-                    <span className="text-sm text-gray-600">Selected Options:</span>{" "}
-                    <span className="text-sm text-gray-900">
-                      {filterPreviewData.selected_options?.join(", ")}
-                    </span>
-                  </div>
-                )}
-                <div className="flex gap-4 pt-2 border-t border-gray-200">
-                  <div>
-                    <span className="text-sm font-semibold text-gray-700">Filtered:</span>{" "}
-                    <span className="text-sm font-bold text-orange-600">
-                      {filterPreviewData.filtered_count}
-                    </span>{" "}
-                    <span className="text-sm text-gray-600">responses</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold text-gray-700">Total:</span>{" "}
-                    <span className="text-sm text-gray-900">{filterPreviewData.total_count}</span>{" "}
-                    <span className="text-sm text-gray-600">responses</span>
-                  </div>
-                  {filterPreviewData.total_count > 0 && (
+                    )
+                  ) || (
                     <div>
-                      <span className="text-sm font-semibold text-gray-700">Percentage:</span>{" "}
-                      <span className="text-sm font-semibold text-gray-900">
-                        {(
-                          (filterPreviewData.filtered_count / filterPreviewData.total_count) *
-                          100
-                        ).toFixed(1)}
-                        %
+                      <span className="text-sm text-gray-600">
+                        Filter Question:
+                      </span>{" "}
+                      <span className="text-sm font-medium text-gray-900">
+                        {filterPreviewData.filter_question}
                       </span>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {filterPreviewData.filtered_count === 0 ? (
-              <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                <div className="flex items-start gap-3">
-                  <svg
-                    className="w-5 h-5 text-yellow-600 mt-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                  <div>
-                    <h4 className="text-sm font-semibold text-yellow-900 mb-1">
-                      No Responses Match This Filter
-                    </h4>
-                    <p className="text-sm text-yellow-800">
-                      {filterPreviewData.message ||
-                        `No responses match the selected filter options: ${filterPreviewData.selected_options?.join(
-                          ", "
-                        )}.`}
-                    </p>
+                  {filterPreviewData.selected_options && (
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Selected Options:
+                      </span>{" "}
+                      <span className="text-sm text-gray-900">
+                        {filterPreviewData.selected_options?.join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex gap-4 pt-2 border-t border-gray-200">
+                    <div>
+                      <span className="text-sm font-semibold text-gray-700">
+                        Filtered:
+                      </span>{" "}
+                      <span className="text-sm font-bold text-orange-600">
+                        {filterPreviewData.filtered_count}
+                      </span>{" "}
+                      <span className="text-sm text-gray-600">responses</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-semibold text-gray-700">
+                        Total:
+                      </span>{" "}
+                      <span className="text-sm text-gray-900">
+                        {filterPreviewData.total_count}
+                      </span>{" "}
+                      <span className="text-sm text-gray-600">responses</span>
+                    </div>
+                    {filterPreviewData.total_count > 0 && (
+                      <div>
+                        <span className="text-sm font-semibold text-gray-700">
+                          Percentage:
+                        </span>{" "}
+                        <span className="text-sm font-semibold text-gray-900">
+                          {(
+                            (filterPreviewData.filtered_count /
+                              filterPreviewData.total_count) *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <svg
-                    className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-blue-900 mb-1">
-                      Your Excel Export Will Include:
-                    </p>
-                    <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
-                      <li>
-                        <strong>{filterPreviewData.filtered_count}</strong> filtered responses
-                        {filterPreviewData.total_count > 0 && (
-                          <span>
-                            {" "}
-                            (
-                            {(
-                              (filterPreviewData.filtered_count / filterPreviewData.total_count) *
-                              100
-                            ).toFixed(1)}
-                            % of total)
-                          </span>
-                        )}
-                      </li>
-                      <li>
-                        All <strong>{filterPreviewData.total_questions}</strong> questions with
-                        complete analytics
-                        {filterPreviewData.exclude_open_text && (
-                          <span className="text-orange-700 font-semibold">
-                            {" "}
-                            ({filterPreviewData.open_text_excluded_count || 0} open text question
-                            {filterPreviewData.open_text_excluded_count !== 1 ? "s" : ""} excluded)
-                          </span>
-                        )}
-                      </li>
-                      {filterPreviewData.exclude_open_text &&
-                        filterPreviewData.total_questions_before_filter && (
+
+              {filterPreviewData.filtered_count === 0 ? (
+                <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                  <div className="flex items-start gap-3">
+                    <svg
+                      className="w-5 h-5 text-yellow-600 mt-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-semibold text-yellow-900 mb-1">
+                        No Responses Match This Filter
+                      </h4>
+                      <p className="text-sm text-yellow-800">
+                        {filterPreviewData.message ||
+                          `No responses match the selected filter options: ${filterPreviewData.selected_options?.join(
+                            ", "
+                          )}.`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg
+                      className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-blue-900 mb-1">
+                        Your Excel Export Will Include:
+                      </p>
+                      <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
+                        <li>
+                          <strong>{filterPreviewData.filtered_count}</strong>{" "}
+                          filtered responses
+                          {filterPreviewData.total_count > 0 && (
+                            <span>
+                              {" "}
+                              (
+                              {(
+                                (filterPreviewData.filtered_count /
+                                  filterPreviewData.total_count) *
+                                100
+                              ).toFixed(1)}
+                              % of total)
+                            </span>
+                          )}
+                        </li>
+                        <li>
+                          All{" "}
+                          <strong>{filterPreviewData.total_questions}</strong>{" "}
+                          questions with complete analytics
+                          {filterPreviewData.exclude_open_text && (
+                            <span className="text-orange-700 font-semibold">
+                              {" "}
+                              ({filterPreviewData.open_text_excluded_count || 0} open text question{filterPreviewData.open_text_excluded_count !== 1 ? 's' : ''} excluded)
+                            </span>
+                          )}
+                        </li>
+                        {filterPreviewData.exclude_open_text && filterPreviewData.total_questions_before_filter && (
                           <li className="text-xs text-gray-600 italic">
-                            (Total questions before filter:{" "}
-                            {filterPreviewData.total_questions_before_filter})
+                            (Total questions before filter: {filterPreviewData.total_questions_before_filter})
                           </li>
                         )}
-                      <li>Response counts, percentages, and statistics for each question</li>
-                      {!filterPreviewData.exclude_open_text && (
-                        <li>All comments and open-text responses</li>
-                      )}
-                    </ul>
+                        <li>
+                          Response counts, percentages, and statistics for each
+                          question
+                        </li>
+                        {!filterPreviewData.exclude_open_text && (
+                          <li>All comments and open-text responses</li>
+                        )}
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
         {activeTab === "filter" && loadingFilterPreview && (
           <div className="mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-200 text-center">
@@ -443,18 +500,24 @@ export default function AnalyticsPage() {
 
         {activeTab === "segmentation" && previewData && !loadingPreview && (
           <div className="mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Live Preview</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              📊 Live Preview
+            </h3>
 
             {/* Segment Summary */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Segment Counts</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                Segment Counts
+              </h4>
               <div className="flex flex-wrap gap-3">
                 {previewData.segment_order?.map((segName: string) => (
                   <div
                     key={segName}
                     className="px-3 py-1.5 bg-white border border-gray-200 rounded-md"
                   >
-                    <span className="text-sm font-medium text-gray-900">{segName}:</span>{" "}
+                    <span className="text-sm font-medium text-gray-900">
+                      {segName}:
+                    </span>{" "}
                     <span className="text-sm text-gray-600">
                       {previewData.segments[segName]?.count || 0} responses
                     </span>
@@ -485,15 +548,17 @@ export default function AnalyticsPage() {
                   </p>
                   <ul className="text-xs text-blue-800 space-y-0.5 list-disc list-inside">
                     <li>
-                      <strong>{previewData.segment_order?.length || 0}</strong> segments (including
-                      "All responses")
+                      <strong>{previewData.segment_order?.length || 0}</strong>{" "}
+                      segments (including "All responses")
                     </li>
                     <li>
-                      All <strong>{previewData.total_questions}</strong> questions with analytics
-                      for each segment
+                      All <strong>{previewData.total_questions}</strong>{" "}
+                      questions with analytics for each segment
                     </li>
                     <li>Side-by-side comparison columns for all segments</li>
-                    <li>Response counts, percentages, and statistics per segment</li>
+                    <li>
+                      Response counts, percentages, and statistics per segment
+                    </li>
                     <li>All comments organized by segment</li>
                   </ul>
                 </div>
@@ -555,11 +620,12 @@ export default function AnalyticsPage() {
                     🔍 Multiple Filters
                   </h4>
                   <p className="text-sm text-orange-800 mb-2">
-                    Add multiple filters to narrow down your results. Filters use{" "}
-                    <strong>AND logic</strong> - responses must match ALL filters. Within each
-                    filter, options use <strong>OR logic</strong> - responses matching ANY option
-                    are included. You can filter by choice questions or numeric ranges (e.g., staff
-                    size).
+                    Add multiple filters to narrow down your results. Filters
+                    use <strong>AND logic</strong> - responses must match ALL
+                    filters. Within each filter, options use{" "}
+                    <strong>OR logic</strong> - responses matching ANY option
+                    are included. You can filter by choice questions or numeric
+                    ranges (e.g., staff size).
                   </p>
                 </div>
 
@@ -569,7 +635,7 @@ export default function AnalyticsPage() {
                     <input
                       type="checkbox"
                       checked={excludeOpenText}
-                      onChange={e => setExcludeOpenText(e.target.checked)}
+                      onChange={(e) => setExcludeOpenText(e.target.checked)}
                       className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                     />
                     <div>
@@ -577,15 +643,18 @@ export default function AnalyticsPage() {
                         Exclude Open Text Questions
                       </span>
                       <p className="text-xs text-gray-600 mt-1">
-                        When enabled, open text questions (text, paragraph) will be excluded from
-                        the export to maintain question order and allow easy copy/paste of data.
+                        When enabled, open text questions (text, paragraph) will
+                        be excluded from the export to maintain question order
+                        and allow easy copy/paste of data.
                       </p>
                     </div>
                   </label>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Filters
+                  </h3>
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
@@ -622,21 +691,30 @@ export default function AnalyticsPage() {
 
                 {filterConfigs.length === 0 && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                    <p className="text-gray-600 text-sm mb-2">No filters configured yet.</p>
+                    <p className="text-gray-600 text-sm mb-2">
+                      No filters configured yet.
+                    </p>
                     <p className="text-gray-500 text-xs">
-                      Click "Add Filter" to create your first filter. You can add multiple filters
-                      to combine conditions.
+                      Click "Add Filter" to create your first filter. You can
+                      add multiple filters to combine conditions.
                     </p>
                   </div>
                 )}
 
                 {filterConfigs.map((filterConfig, filterIdx) => (
-                  <div key={filterIdx} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                  <div
+                    key={filterIdx}
+                    className="border border-gray-200 rounded-lg p-4 space-y-4"
+                  >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-gray-900">Filter {filterIdx + 1}</h4>
+                      <h4 className="font-medium text-gray-900">
+                        Filter {filterIdx + 1}
+                      </h4>
                       <button
                         onClick={() => {
-                          setFilterConfigs(filterConfigs.filter((_, i) => i !== filterIdx));
+                          setFilterConfigs(
+                            filterConfigs.filter((_, i) => i !== filterIdx)
+                          );
                         }}
                         className="text-red-600 hover:text-red-800 text-sm"
                       >
@@ -650,7 +728,7 @@ export default function AnalyticsPage() {
                       </label>
                       <select
                         value={filterConfig.filterType || "choice"}
-                        onChange={e => {
+                        onChange={(e) => {
                           const newFilters = [...filterConfigs];
                           newFilters[filterIdx] = {
                             questionId: "",
@@ -675,14 +753,13 @@ export default function AnalyticsPage() {
                       </label>
                       <select
                         value={filterConfig.questionId}
-                        onChange={e => {
+                        onChange={(e) => {
                           const newFilters = [...filterConfigs];
                           newFilters[filterIdx] = {
                             ...newFilters[filterIdx],
                             questionId: e.target.value,
                             selectedOptions: filterConfig.filterType === "choice" ? [] : undefined,
-                            numericRange:
-                              filterConfig.filterType === "numeric" ? [null, null] : undefined,
+                            numericRange: filterConfig.filterType === "numeric" ? [null, null] : undefined,
                           };
                           setFilterConfigs(newFilters);
                         }}
@@ -692,14 +769,15 @@ export default function AnalyticsPage() {
                         {filterConfig.filterType === "numeric"
                           ? surveyQuestions
                               .filter(
-                                q =>
+                                (q) =>
                                   (q.primary_type === "open_text" &&
                                     ["number", "positive_number", "negative_number"].includes(
                                       q.secondary_type || ""
                                     )) ||
-                                  (q.primary_type === "form" && q.secondary_type === "form_fields")
+                                  (q.primary_type === "form" &&
+                                    q.secondary_type === "form_fields")
                               )
-                              .map(q => (
+                              .map((q) => (
                                 <option key={q.id} value={q.id}>
                                   Q{q.order + 1}: {q.question_text.substring(0, 60)}
                                   {q.question_text.length > 60 ? "..." : ""}
@@ -707,13 +785,15 @@ export default function AnalyticsPage() {
                               ))
                           : surveyQuestions
                               .filter(
-                                q =>
+                                (q) =>
                                   q.primary_type === "form" &&
-                                  ["radio", "dropdown", "multiple_choices"].includes(
-                                    q.secondary_type || ""
-                                  )
+                                  [
+                                    "radio",
+                                    "dropdown",
+                                    "multiple_choices",
+                                  ].includes(q.secondary_type || "")
                               )
-                              .map(q => (
+                              .map((q) => (
                                 <option key={q.id} value={q.id}>
                                   Q{q.order + 1}: {q.question_text.substring(0, 60)}
                                   {q.question_text.length > 60 ? "..." : ""}
@@ -726,7 +806,7 @@ export default function AnalyticsPage() {
                       filterConfig.filterType === "choice" &&
                       (() => {
                         const selectedQ = surveyQuestions.find(
-                          q => q.id === parseInt(filterConfig.questionId)
+                          (q) => q.id === parseInt(filterConfig.questionId)
                         );
                         return selectedQ ? (
                           <div>
@@ -735,17 +815,23 @@ export default function AnalyticsPage() {
                             </label>
                             <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-gray-200">
                               {selectedQ.options?.map((option, idx) => (
-                                <label key={idx} className="flex items-center space-x-2 py-2">
+                                <label
+                                  key={idx}
+                                  className="flex items-center space-x-2 py-2"
+                                >
                                   <input
                                     type="checkbox"
-                                    checked={filterConfig.selectedOptions?.includes(option)}
-                                    onChange={e => {
+                                    checked={filterConfig.selectedOptions?.includes(
+                                      option
+                                    )}
+                                    onChange={(e) => {
                                       const newFilters = [...filterConfigs];
                                       if (e.target.checked) {
                                         newFilters[filterIdx] = {
                                           ...newFilters[filterIdx],
                                           selectedOptions: [
-                                            ...(newFilters[filterIdx].selectedOptions || []),
+                                            ...(newFilters[filterIdx]
+                                              .selectedOptions || []),
                                             option,
                                           ],
                                         };
@@ -753,96 +839,108 @@ export default function AnalyticsPage() {
                                         newFilters[filterIdx] = {
                                           ...newFilters[filterIdx],
                                           selectedOptions: (
-                                            newFilters[filterIdx].selectedOptions || []
-                                          ).filter(opt => opt !== option),
+                                            newFilters[filterIdx]
+                                              .selectedOptions || []
+                                          ).filter((opt) => opt !== option),
                                         };
                                       }
                                       setFilterConfigs(newFilters);
                                     }}
                                     className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                                   />
-                                  <span className="text-sm text-gray-700">{option}</span>
+                                  <span className="text-sm text-gray-700">
+                                    {option}
+                                  </span>
                                 </label>
                               ))}
                             </div>
                             <p className="mt-2 text-xs text-gray-500">
-                              Selected: {filterConfig.selectedOptions?.length || 0} option(s)
+                              Selected: {filterConfig.selectedOptions?.length || 0}{" "}
+                              option(s)
                             </p>
                           </div>
                         ) : null;
                       })()}
 
-                    {filterConfig.questionId && filterConfig.filterType === "numeric" && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Numeric Range (leave blank for unbounded)
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">
-                              Minimum (inclusive)
-                            </label>
-                            <input
-                              type="number"
-                              value={
-                                filterConfig.numericRange?.[0] === null ||
-                                filterConfig.numericRange?.[0] === undefined
-                                  ? ""
-                                  : filterConfig.numericRange[0]
-                              }
-                              onChange={e => {
-                                const newFilters = [...filterConfigs];
-                                const minValue =
-                                  e.target.value === "" ? null : parseFloat(e.target.value);
-                                newFilters[filterIdx] = {
-                                  ...newFilters[filterIdx],
-                                  numericRange: [
-                                    minValue,
-                                    newFilters[filterIdx].numericRange?.[1] || null,
-                                  ],
-                                };
-                                setFilterConfigs(newFilters);
-                              }}
-                              placeholder="Min (or leave blank)"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
-                            />
+                    {filterConfig.questionId &&
+                      filterConfig.filterType === "numeric" && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Numeric Range (leave blank for unbounded)
+                          </label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Minimum (inclusive)
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  filterConfig.numericRange?.[0] === null ||
+                                  filterConfig.numericRange?.[0] === undefined
+                                    ? ""
+                                    : filterConfig.numericRange[0]
+                                }
+                                onChange={(e) => {
+                                  const newFilters = [...filterConfigs];
+                                  const minValue =
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value);
+                                  newFilters[filterIdx] = {
+                                    ...newFilters[filterIdx],
+                                    numericRange: [
+                                      minValue,
+                                      newFilters[filterIdx].numericRange?.[1] ||
+                                        null,
+                                    ],
+                                  };
+                                  setFilterConfigs(newFilters);
+                                }}
+                                placeholder="Min (or leave blank)"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Maximum (inclusive)
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  filterConfig.numericRange?.[1] === null ||
+                                  filterConfig.numericRange?.[1] === undefined
+                                    ? ""
+                                    : filterConfig.numericRange[1]
+                                }
+                                onChange={(e) => {
+                                  const newFilters = [...filterConfigs];
+                                  const maxValue =
+                                    e.target.value === ""
+                                      ? null
+                                      : parseFloat(e.target.value);
+                                  newFilters[filterIdx] = {
+                                    ...newFilters[filterIdx],
+                                    numericRange: [
+                                      newFilters[filterIdx].numericRange?.[0] ||
+                                        null,
+                                      maxValue,
+                                    ],
+                                  };
+                                  setFilterConfigs(newFilters);
+                                }}
+                                placeholder="Max (or leave blank)"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">
-                              Maximum (inclusive)
-                            </label>
-                            <input
-                              type="number"
-                              value={
-                                filterConfig.numericRange?.[1] === null ||
-                                filterConfig.numericRange?.[1] === undefined
-                                  ? ""
-                                  : filterConfig.numericRange[1]
-                              }
-                              onChange={e => {
-                                const newFilters = [...filterConfigs];
-                                const maxValue =
-                                  e.target.value === "" ? null : parseFloat(e.target.value);
-                                newFilters[filterIdx] = {
-                                  ...newFilters[filterIdx],
-                                  numericRange: [
-                                    newFilters[filterIdx].numericRange?.[0] || null,
-                                    maxValue,
-                                  ],
-                                };
-                                setFilterConfigs(newFilters);
-                              }}
-                              placeholder="Max (or leave blank)"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-black"
-                            />
-                          </div>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Responses with values within this range will be
+                            included. Leave both blank to include all numeric
+                            responses.
+                          </p>
                         </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          Responses with values within this range will be included. Leave both blank
-                          to include all numeric responses.
-                        </p>
-                      </div>
-                    )}
+                      )}
                   </div>
                 ))}
 
@@ -853,17 +951,21 @@ export default function AnalyticsPage() {
                     disabled={
                       generatingFiltered ||
                       filterConfigs.length === 0 ||
-                      filterConfigs.some(f => {
+                      filterConfigs.some((f) => {
                         if (!f.questionId) return true;
                         if (f.filterType === "numeric") {
                           return !f.numericRange;
                         }
-                        return !f.selectedOptions || f.selectedOptions.length === 0;
+                        return (
+                          !f.selectedOptions || f.selectedOptions.length === 0
+                        );
                       })
                     }
                     className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {generatingFiltered ? "Exporting..." : "Export Filtered Analytics"}
+                    {generatingFiltered
+                      ? "Exporting..."
+                      : "Export Filtered Analytics"}
                   </button>
                 </div>
               </>
@@ -886,24 +988,27 @@ export default function AnalyticsPage() {
                     📊 What is a Dimension?
                   </h4>
                   <p className="text-sm text-blue-800 mb-2">
-                    A <strong>dimension</strong> is a way to group your respondents into segments.
-                    Each dimension creates multiple segments that will appear as separate columns in
-                    your Excel export.
+                    A <strong>dimension</strong> is a way to group your
+                    respondents into segments. Each dimension creates multiple
+                    segments that will appear as separate columns in your Excel
+                    export.
                   </p>
                   <div className="text-xs text-blue-700 space-y-1">
                     <p>
-                      <strong>Example 1:</strong> "Staff Size" dimension with segments: Small (5-9),
-                      Medium (10-19), Large (20-49)
+                      <strong>Example 1:</strong> "Staff Size" dimension with
+                      segments: Small (5-9), Medium (10-19), Large (20-49)
                     </p>
                     <p>
-                      <strong>Example 2:</strong> "Location" dimension with segments: London & SE,
-                      Midlands, North, Scotland
+                      <strong>Example 2:</strong> "Location" dimension with
+                      segments: London & SE, Midlands, North, Scotland
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Segmentation Dimensions</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Segmentation Dimensions
+                  </h3>
                   <button
                     onClick={() => {
                       setSegmentationDimensions([
@@ -924,23 +1029,33 @@ export default function AnalyticsPage() {
 
                 {segmentationDimensions.length === 0 && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                    <p className="text-gray-600 text-sm mb-2">No dimensions configured yet.</p>
+                    <p className="text-gray-600 text-sm mb-2">
+                      No dimensions configured yet.
+                    </p>
                     <p className="text-gray-500 text-xs">
-                      Click "Add Dimension" to create your first segmentation dimension. You can add
-                      multiple dimensions (e.g., Staff Size, Location, etc.) and all segments will
-                      appear side-by-side in the export.
+                      Click "Add Dimension" to create your first segmentation
+                      dimension. You can add multiple dimensions (e.g., Staff
+                      Size, Location, etc.) and all segments will appear
+                      side-by-side in the export.
                     </p>
                   </div>
                 )}
 
                 {segmentationDimensions.map((dim, dimIdx) => (
-                  <div key={dimIdx} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                  <div
+                    key={dimIdx}
+                    className="border border-gray-200 rounded-lg p-4 space-y-4"
+                  >
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-gray-900">Dimension {dimIdx + 1}</h4>
+                      <h4 className="font-medium text-gray-900">
+                        Dimension {dimIdx + 1}
+                      </h4>
                       <button
                         onClick={() => {
                           setSegmentationDimensions(
-                            segmentationDimensions.filter((_, i) => i !== dimIdx)
+                            segmentationDimensions.filter(
+                              (_, i) => i !== dimIdx
+                            )
                           );
                         }}
                         className="text-red-600 hover:text-red-800 text-sm"
@@ -954,13 +1069,13 @@ export default function AnalyticsPage() {
                         Dimension Name (Optional)
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        Give this dimension a friendly name (e.g., "Staff Size", "Location"). This
-                        helps you identify it later.
+                        Give this dimension a friendly name (e.g., "Staff Size",
+                        "Location"). This helps you identify it later.
                       </p>
                       <input
                         type="text"
                         value={dim.name}
-                        onChange={e => {
+                        onChange={(e) => {
                           const newDims = [...segmentationDimensions];
                           newDims[dimIdx].name = e.target.value;
                           setSegmentationDimensions(newDims);
@@ -975,18 +1090,22 @@ export default function AnalyticsPage() {
                         Question *
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        Select the question that will be used to segment respondents. Based on the
-                        question type, you'll configure either numeric ranges or choice mappings.
+                        Select the question that will be used to segment
+                        respondents. Based on the question type, you'll
+                        configure either numeric ranges or choice mappings.
                       </p>
                       <select
                         value={dim.question_id}
-                        onChange={e => {
+                        onChange={(e) => {
                           const newDims = [...segmentationDimensions];
                           const qid = parseInt(e.target.value);
                           newDims[dimIdx].question_id = qid;
-                          const q = surveyQuestions.find(q => q.id === qid);
+                          const q = surveyQuestions.find((q) => q.id === qid);
                           if (q) {
-                            if (q.primary_type === "form" && q.secondary_type === "form_fields") {
+                            if (
+                              q.primary_type === "form" &&
+                              q.secondary_type === "form_fields"
+                            ) {
                               newDims[dimIdx].type = "numeric_range";
                               newDims[dimIdx].ranges = {};
                             } else {
@@ -999,9 +1118,9 @@ export default function AnalyticsPage() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                       >
                         <option value={0}>Select a question...</option>
-                        {surveyQuestions.map(q => (
+                        {surveyQuestions.map((q) => (
                           <option key={q.id} value={q.id}>
-                            Q{q.order + 1}: {q.question_text.substring(0, 60)}
+                            Q{surveyQuestions.indexOf(q) + 1}: {q.question_text.substring(0, 60)}
                             {q.question_text.length > 60 ? "..." : ""}
                           </option>
                         ))}
@@ -1010,13 +1129,17 @@ export default function AnalyticsPage() {
 
                     {dim.question_id > 0 &&
                       (() => {
-                        const q = surveyQuestions.find(q => q.id === dim.question_id);
+                        const q = surveyQuestions.find(
+                          (q) => q.id === dim.question_id
+                        );
                         if (!q) return null;
 
                         if (
                           dim.type === "choice_mapping" &&
                           q.primary_type === "form" &&
-                          ["radio", "dropdown", "multiple_choices"].includes(q.secondary_type || "")
+                          ["radio", "dropdown", "multiple_choices"].includes(
+                            q.secondary_type || ""
+                          )
                         ) {
                           return (
                             <div>
@@ -1024,21 +1147,31 @@ export default function AnalyticsPage() {
                                 Map Options to Segment Names
                               </label>
                               <p className="text-xs text-gray-500 mb-2">
-                                For each answer option, enter the segment name it should map to.
-                                Multiple options can map to the same segment (e.g., "East Midlands"
-                                and "West Midlands" both map to "Midlands").
+                                For each answer option, enter the segment name
+                                it should map to. Multiple options can map to
+                                the same segment (e.g., "East Midlands" and
+                                "West Midlands" both map to "Midlands").
                               </p>
                               <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto space-y-2">
                                 {q.options?.map((option, optIdx) => (
-                                  <div key={optIdx} className="flex items-center gap-2">
-                                    <span className="w-32 text-sm text-gray-700">{option}:</span>
+                                  <div
+                                    key={optIdx}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="w-32 text-sm text-gray-700">
+                                      {option}:
+                                    </span>
                                     <input
                                       type="text"
                                       value={dim.mapping?.[option] || ""}
-                                      onChange={e => {
-                                        const newDims = [...segmentationDimensions];
-                                        if (!newDims[dimIdx].mapping) newDims[dimIdx].mapping = {};
-                                        newDims[dimIdx].mapping![option] = e.target.value;
+                                      onChange={(e) => {
+                                        const newDims = [
+                                          ...segmentationDimensions,
+                                        ];
+                                        if (!newDims[dimIdx].mapping)
+                                          newDims[dimIdx].mapping = {};
+                                        newDims[dimIdx].mapping![option] =
+                                          e.target.value;
                                         setSegmentationDimensions(newDims);
                                       }}
                                       placeholder="Segment name"
@@ -1048,7 +1181,8 @@ export default function AnalyticsPage() {
                                 ))}
                               </div>
                               <p className="mt-2 text-xs text-gray-500">
-                                💡 Tip: Leave empty to exclude that option from segmentation.
+                                💡 Tip: Leave empty to exclude that option from
+                                segmentation.
                               </p>
                             </div>
                           );
@@ -1063,23 +1197,35 @@ export default function AnalyticsPage() {
                                 Define Ranges
                               </label>
                               <p className="text-xs text-gray-500 mb-2">
-                                Create segments based on numeric ranges. Leave min empty for "less
-                                than", leave max empty for "greater than". Values are inclusive
-                                (e.g., 5-9 means 5 ≤ value ≤ 9).
+                                Create segments based on numeric ranges. Leave
+                                min empty for "less than", leave max empty for
+                                "greater than". Values are inclusive (e.g., 5-9
+                                means 5 ≤ value ≤ 9).
                               </p>
                               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                                 {Object.entries(dim.ranges || {}).map(
                                   ([segName, [min, max]], rangeIdx) => (
-                                    <div key={rangeIdx} className="flex items-center gap-2">
+                                    <div
+                                      key={rangeIdx}
+                                      className="flex items-center gap-2"
+                                    >
                                       <input
                                         type="text"
                                         value={segName}
-                                        onChange={e => {
-                                          const newDims = [...segmentationDimensions];
-                                          if (!newDims[dimIdx].ranges) newDims[dimIdx].ranges = {};
-                                          const oldVal = newDims[dimIdx].ranges![segName];
-                                          delete newDims[dimIdx].ranges![segName];
-                                          newDims[dimIdx].ranges![e.target.value] = oldVal;
+                                        onChange={(e) => {
+                                          const newDims = [
+                                            ...segmentationDimensions,
+                                          ];
+                                          if (!newDims[dimIdx].ranges)
+                                            newDims[dimIdx].ranges = {};
+                                          const oldVal =
+                                            newDims[dimIdx].ranges![segName];
+                                          delete newDims[dimIdx].ranges![
+                                            segName
+                                          ];
+                                          newDims[dimIdx].ranges![
+                                            e.target.value
+                                          ] = oldVal;
                                           setSegmentationDimensions(newDims);
                                         }}
                                         placeholder="Segment name"
@@ -1088,9 +1234,12 @@ export default function AnalyticsPage() {
                                       <input
                                         type="number"
                                         value={min === null ? "" : min}
-                                        onChange={e => {
-                                          const newDims = [...segmentationDimensions];
-                                          if (!newDims[dimIdx].ranges) newDims[dimIdx].ranges = {};
+                                        onChange={(e) => {
+                                          const newDims = [
+                                            ...segmentationDimensions,
+                                          ];
+                                          if (!newDims[dimIdx].ranges)
+                                            newDims[dimIdx].ranges = {};
                                           newDims[dimIdx].ranges![segName] = [
                                             e.target.value === ""
                                               ? null
@@ -1106,9 +1255,12 @@ export default function AnalyticsPage() {
                                       <input
                                         type="number"
                                         value={max === null ? "" : max}
-                                        onChange={e => {
-                                          const newDims = [...segmentationDimensions];
-                                          if (!newDims[dimIdx].ranges) newDims[dimIdx].ranges = {};
+                                        onChange={(e) => {
+                                          const newDims = [
+                                            ...segmentationDimensions,
+                                          ];
+                                          if (!newDims[dimIdx].ranges)
+                                            newDims[dimIdx].ranges = {};
                                           newDims[dimIdx].ranges![segName] = [
                                             min,
                                             e.target.value === ""
@@ -1122,9 +1274,13 @@ export default function AnalyticsPage() {
                                       />
                                       <button
                                         onClick={() => {
-                                          const newDims = [...segmentationDimensions];
+                                          const newDims = [
+                                            ...segmentationDimensions,
+                                          ];
                                           if (newDims[dimIdx].ranges) {
-                                            delete newDims[dimIdx].ranges![segName];
+                                            delete newDims[dimIdx].ranges![
+                                              segName
+                                            ];
                                           }
                                           setSegmentationDimensions(newDims);
                                         }}
@@ -1150,8 +1306,12 @@ export default function AnalyticsPage() {
                                 <button
                                   onClick={() => {
                                     const newDims = [...segmentationDimensions];
-                                    if (!newDims[dimIdx].ranges) newDims[dimIdx].ranges = {};
-                                    newDims[dimIdx].ranges!["New Segment"] = [null, null];
+                                    if (!newDims[dimIdx].ranges)
+                                      newDims[dimIdx].ranges = {};
+                                    newDims[dimIdx].ranges!["New Segment"] = [
+                                      null,
+                                      null,
+                                    ];
                                     setSegmentationDimensions(newDims);
                                   }}
                                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -1160,8 +1320,9 @@ export default function AnalyticsPage() {
                                 </button>
                               </div>
                               <p className="mt-2 text-xs text-gray-500">
-                                💡 Example: "Small" (min: 5, max: 9), "Medium" (min: 10, max: 19),
-                                "Large" (min: 20, max: empty)
+                                💡 Example: "Small" (min: 5, max: 9), "Medium"
+                                (min: 10, max: 19), "Large" (min: 20, max:
+                                empty)
                               </p>
                             </div>
                           );
@@ -1179,16 +1340,19 @@ export default function AnalyticsPage() {
                       generatingSegmented ||
                       segmentationDimensions.length === 0 ||
                       segmentationDimensions.some(
-                        d =>
+                        (d) =>
                           d.question_id === 0 ||
                           (d.type === "choice_mapping" &&
                             Object.keys(d.mapping || {}).length === 0) ||
-                          (d.type === "numeric_range" && Object.keys(d.ranges || {}).length === 0)
+                          (d.type === "numeric_range" &&
+                            Object.keys(d.ranges || {}).length === 0)
                       )
                     }
                     className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {generatingSegmented ? "Exporting..." : "Export Segmented Analytics"}
+                    {generatingSegmented
+                      ? "Exporting..."
+                      : "Export Segmented Analytics"}
                   </button>
                 </div>
               </>

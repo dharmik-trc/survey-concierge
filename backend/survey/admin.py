@@ -1,30 +1,20 @@
-import json
-
-from django import forms
 from django.contrib import admin
+from django import forms
 from django.utils.safestring import mark_safe
-
-from .models import (
-    QUESTION_HIERARCHY,
-    PartialSurveyResponse,
-    Question,
-    QuestionResponse,
-    Survey,
-    SurveyResponse,
-)
-
+import json
+from .models import Survey, Question, SurveyResponse, QuestionResponse, PartialSurveyResponse, QUESTION_HIERARCHY
 
 class SubfieldValidationWidget(forms.Widget):
     """User-friendly widget for editing subfield validations with dropdowns and buttons."""
-
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.attrs.update({"class": "subfield-validation-widget"})
-
+        self.attrs.update({'class': 'subfield-validation-widget'})
+    
     def render(self, name, value, attrs=None, renderer=None):
         if attrs is None:
             attrs = {}
-
+        
         # Parse current value
         current_validations = {}
         if value:
@@ -37,9 +27,9 @@ class SubfieldValidationWidget(forms.Widget):
                     current_validations = {}
             except (json.JSONDecodeError, TypeError):
                 current_validations = {}
-
+        
         # Build the HTML for the widget
-        widget_html = f"""
+        widget_html = f'''
         <div class="subfield-validation-container" style="border: 1px solid #ddd; padding: 15px; background: #000000; border-radius: 4px;">
             <h4 style="margin-top: 0; color: white;">Subfield Validation Rules</h4>
             <p style="color: white; font-size: 12px; margin-bottom: 15px;">
@@ -157,7 +147,8 @@ class SubfieldValidationWidget(forms.Widget):
                 }});
                 
                 return row;
-            }}            
+            }}
+            
             // Add button click handler
             addButton.addEventListener('click', function() {{
                 const row = createRuleRow();
@@ -240,12 +231,12 @@ class SubfieldValidationWidget(forms.Widget):
             }}
         }})();
         </script>
-        """
-
+        '''
+        
         return mark_safe(widget_html)
-
+    
     def value_from_datadict(self, data, files, name):
-        value = data.get(name, "{}")
+        value = data.get(name, '{}')
         try:
             # If it's already a string, return it as-is (Django JSONField expects a string)
             if isinstance(value, str):
@@ -256,25 +247,24 @@ class SubfieldValidationWidget(forms.Widget):
             elif isinstance(value, dict):
                 return json.dumps(value)
             else:
-                return "{}"
+                return '{}'
         except (json.JSONDecodeError, TypeError):
-            return "{}"
-
+            return '{}'
 
 class QuestionAdminForm(forms.ModelForm):
     # Override secondary_type to be a ChoiceField with all possible choices
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        
         # Collect all possible secondary choices from all primary types for the dropdown
-        all_secondary_choices = [("", "---------")]
+        all_secondary_choices = [('', '---------')]
         for primary_type, choices in QUESTION_HIERARCHY.items():
             for choice in choices:
                 if choice not in all_secondary_choices:
                     all_secondary_choices.append(choice)
-
+        
         # Replace the CharField with a ChoiceField
-        self.fields["secondary_type"] = forms.ChoiceField(
+        self.fields['secondary_type'] = forms.ChoiceField(
             choices=all_secondary_choices,
             required=False,
             help_text=(
@@ -283,65 +273,66 @@ class QuestionAdminForm(forms.ModelForm):
                 "Form: multiple_choices, radio, dropdown, form_fields, fields, yes_no. "
                 "Grid: grid_radio, grid_multi. "
                 "Scale: slider."
-            ),
-        )
-
-        # Make exclusive_column a dropdown populated from options field
-        if "exclusive_column" in self.fields:
-            self.fields["exclusive_column"] = forms.ChoiceField(
-                choices=[("", "---------")],
-                required=False,
-                help_text="Select which option should be exclusive (only one option can be selected per row). First add options above, then select one here.",
             )
-
+        )
+        
+        # Make exclusive_column a dropdown populated from options field
+        if 'exclusive_column' in self.fields:
+            self.fields['exclusive_column'] = forms.ChoiceField(
+                choices=[('', '---------')],
+                required=False,
+                help_text='Select which option should be exclusive (only one option can be selected per row). First add options above, then select one here.'
+            )
+            
             # Populate choices from options field
             if self.instance and self.instance.pk:
                 options = self.instance.options
                 if options and isinstance(options, list):
-                    option_choices = [("", "---------")] + [(opt, opt) for opt in options]
-
+                    option_choices = [('', '---------')] + [(opt, opt) for opt in options]
+                    
                     # Add NOTA option if it exists
                     if self.instance.none_option_text:
-                        option_choices.append(
-                            (self.instance.none_option_text, self.instance.none_option_text)
-                        )
-
-                    self.fields["exclusive_column"].choices = option_choices
-
+                        option_choices.append((self.instance.none_option_text, self.instance.none_option_text))
+                    
+                    self.fields['exclusive_column'].choices = option_choices
+        
         # Add custom widget for subfield validations
-        if "subfield_validations" in self.fields:
-            self.fields["subfield_validations"].widget = SubfieldValidationWidget()
-            self.fields["subfield_validations"].help_text = mark_safe(
+        if 'subfield_validations' in self.fields:
+            self.fields['subfield_validations'].widget = SubfieldValidationWidget()
+            self.fields['subfield_validations'].help_text = mark_safe(
                 "<strong>Easy Form Builder:</strong> Use the form below to set validation rules for each field. "
                 "No technical knowledge required!"
             )
-
+        
+    
     class Meta:
         model = Question
-        fields = "__all__"
-
+        fields = '__all__'
+    
     def clean(self):
         cleaned_data = super().clean()
-        primary_type = cleaned_data.get("primary_type")
-        secondary_type = cleaned_data.get("secondary_type")
-        subfield_validations = cleaned_data.get("subfield_validations")
-
+        primary_type = cleaned_data.get('primary_type')
+        secondary_type = cleaned_data.get('secondary_type')
+        subfield_validations = cleaned_data.get('subfield_validations')
+        
         if primary_type and secondary_type:
             valid_secondaries = QUESTION_HIERARCHY.get(primary_type, [])
             valid_secondary_keys = [s[0] for s in valid_secondaries]
             valid_secondary_labels = [f"{s[0]} ({s[1]})" for s in valid_secondaries]
-
+            
             if secondary_type not in valid_secondary_keys:
-                primary_labels = {"open_text": "Open Text", "form": "Form", "grid": "Grid"}
+                primary_labels = {
+                    'open_text': 'Open Text',
+                    'form': 'Form', 
+                    'grid': 'Grid'
+                }
                 primary_label = primary_labels.get(primary_type, primary_type)
-
-                raise forms.ValidationError(
-                    {
-                        "secondary_type": f"The secondary type '{secondary_type}' is not valid for primary type '{primary_label}'. "
-                        f"Valid options for '{primary_label}' are: {', '.join(valid_secondary_labels)}."
-                    }
-                )
-
+                
+                raise forms.ValidationError({
+                    'secondary_type': f"The secondary type '{secondary_type}' is not valid for primary type '{primary_label}'. "
+                                    f"Valid options for '{primary_label}' are: {', '.join(valid_secondary_labels)}."
+                })
+        
         # Validate subfield_validations JSON format
         if subfield_validations:
             try:
@@ -349,303 +340,185 @@ class QuestionAdminForm(forms.ModelForm):
                     parsed = json.loads(subfield_validations)
                 else:
                     parsed = subfield_validations
-
+                
                 # Validate structure (simplified validation - the widget handles most of this)
-                valid_types = [
-                    "positive_number",
-                    "negative_number",
-                    "all_numbers",
-                    "email",
-                    "text",
-                    "auto_calculate",
-                ]
+                valid_types = ['positive_number', 'negative_number', 'all_numbers', 'email', 'text', 'auto_calculate']
                 for field_name, validation in parsed.items():
                     if not isinstance(validation, dict):
-                        raise forms.ValidationError(
-                            {
-                                "subfield_validations": f"There's an issue with the validation rule for '{field_name}'. Please use the form builder above."
-                            }
-                        )
-
-                    field_type = validation.get("type")
+                        raise forms.ValidationError({
+                            'subfield_validations': f"There's an issue with the validation rule for '{field_name}'. Please use the form builder above."
+                        })
+                    
+                    field_type = validation.get('type')
                     if field_type and field_type not in valid_types:
-                        raise forms.ValidationError(
-                            {
-                                "subfield_validations": f"The validation type '{field_type}' for field '{field_name}' is not supported. Please use the dropdown options in the form builder."
-                            }
-                        )
-
+                        raise forms.ValidationError({
+                            'subfield_validations': f"The validation type '{field_type}' for field '{field_name}' is not supported. Please use the dropdown options in the form builder."
+                        })
+                        
             except json.JSONDecodeError as e:
-                raise forms.ValidationError(
-                    {"subfield_validations": f"Invalid JSON format: {str(e)}"}
-                )
-
+                raise forms.ValidationError({
+                    'subfield_validations': f"Invalid JSON format: {str(e)}"
+                })
+        
         return cleaned_data
-
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    list_display = ["title", "created_at", "updated_at", "is_active", "store_basic_details"]
-    list_filter = ["is_active", "store_basic_details", "created_at"]
-    search_fields = ["title", "description"]
-    readonly_fields = ["created_at", "updated_at"]
+    list_display = ['title', 'created_at', 'updated_at', 'is_active', 'store_basic_details']
+    list_filter = ['is_active', 'store_basic_details', 'created_at']
+    search_fields = ['title', 'description']
+    readonly_fields = ['created_at', 'updated_at']
     fieldsets = (
-        (
-            "Basic Information",
-            {
-                "fields": (
-                    "title",
-                    "description",
-                    "logo_url",
-                    "concierge_logo_url",
-                    "thank_you_message",
-                )
-            },
-        ),
-        (
-            "Settings",
-            {
-                "fields": ("is_active", "store_basic_details"),
-                "description": "store_basic_details: Enable storing basic details (like email) when users click Next on specific questions",
-            },
-        ),
-        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+        ('Basic Information', {
+            'fields': ('title', 'description', 'logo_url', 'concierge_logo_url', 'thank_you_message')
+        }),
+        ('Settings', {
+            'fields': ('is_active', 'store_basic_details'),
+            'description': 'store_basic_details: Enable storing basic details (like email) when users click Next on specific questions'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
     )
-
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     form = QuestionAdminForm
-    list_display = [
-        "question_text",
-        "survey",
-        "primary_type",
-        "secondary_type",
-        "is_required",
-        "has_none_option",
-        "has_other_option",
-        "exclusive_column",
-        "randomize_rows",
-        "randomize_columns",
-        "store_on_next",
-        "order",
-    ]
-    list_filter = [
-        "primary_type",
-        "secondary_type",
-        "is_required",
-        "has_none_option",
-        "has_other_option",
-        "randomize_rows",
-        "randomize_columns",
-        "store_on_next",
-        "survey",
-    ]
-    search_fields = ["question_text", "survey__title"]
-    ordering = ["survey", "order"]
-
+    list_display = ['question_text', 'survey', 'primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'exclusive_column', 'randomize_rows', 'randomize_columns', 'store_on_next', 'order']
+    list_filter = ['primary_type', 'secondary_type', 'is_required', 'has_none_option', 'has_other_option', 'randomize_rows', 'randomize_columns', 'store_on_next', 'survey']
+    search_fields = ['question_text', 'survey__title']
+    ordering = ['survey', 'order']
+    
     fieldsets = (
-        (
-            "Basic Information",
-            {
-                "fields": (
-                    "survey",
-                    "question_text",
-                    "primary_type",
-                    "secondary_type",
-                    "is_required",
-                    "order",
-                )
-            },
-        ),
-        (
-            "Scale/Rating Settings",
-            {
-                "fields": (
-                    "scale_min",
-                    "scale_max",
-                    "scale_step",
-                    "scale_min_label",
-                    "scale_max_label",
-                ),
-                "description": 'For Slider questions. Defaults: 0-10 (perfect for NPS). Customize min/max for other scales (e.g., 1-5 stars). Add labels like "Not likely" / "Very likely".',
-            },
-        ),
-        (
-            "Options & Choices",
-            {
-                "fields": ("options", "randomize_options"),
-            },
-        ),
-        (
-            "None of the above",
-            {
-                "fields": ("has_none_option", "none_option_text"),
-            },
-        ),
-        (
-            "Exclusive Column",
-            {
-                "fields": ("exclusive_column",),
-            },
-        ),
-        (
-            "Other (please specify)",
-            {
-                "fields": ("has_other_option",),
-            },
-        ),
-        (
-            "Grid Settings",
-            {
-                "fields": ("rows", "columns", "randomize_rows", "randomize_columns"),
-                "description": "For Grid questions. Define rows and columns, then optionally randomize their order to reduce bias.",
-            },
-        ),
-        (
-            "Form Fields",
-            {
-                "fields": ("subfields", "subfield_validations"),
-            },
-        ),
-        (
-            "Additional Features",
-            {
-                "fields": ("has_comment_box", "comment_box_label", "comment_box_trigger_value"),
-            },
-        ),
-        (
-            "Store on Next",
-            {
-                "fields": ("store_on_next",),
-            },
-        ),
-        ("Grouping", {"fields": ("section_title",), "classes": ("collapse",)}),
+        ('Basic Information', {
+            'fields': ('survey', 'question_text', 'primary_type', 'secondary_type', 'is_required', 'order')
+        }),
+        ('Scale/Rating Settings', {
+            'fields': ('scale_min', 'scale_max', 'scale_step', 'scale_min_label', 'scale_max_label'),
+            'description': 'For Slider questions. Defaults: 0-10 (perfect for NPS). Customize min/max for other scales (e.g., 1-5 stars). Add labels like "Not likely" / "Very likely".'
+        }),
+        ('Options & Choices', {
+            'fields': ('options', 'randomize_options'),
+        }),
+        ('None of the above', {
+            'fields': ('has_none_option', 'none_option_text'),
+        }),
+        ('Exclusive Column', {
+            'fields': ('exclusive_column',),
+        }),
+         ('Other (please specify)', {
+             'fields': ('has_other_option',),
+         }),
+        ('Grid Settings', {
+            'fields': ('rows', 'columns', 'randomize_rows', 'randomize_columns'),
+            'description': 'For Grid questions. Define rows and columns, then optionally randomize their order to reduce bias.'
+        }),
+        ('Form Fields', {
+            'fields': ('subfields', 'subfield_validations'),
+        }),
+        ('Additional Features', {
+            'fields': ('has_comment_box', 'comment_box_label', 'comment_box_trigger_value'),
+        }),
+        ('Store on Next', {
+            'fields': ('store_on_next',),
+        }),
+        ('Grouping', {
+            'fields': ('section_title',),
+            'classes': ('collapse',)
+        }),
     )
-
+    
     class Media:
-        js = ("admin/js/question_admin.js",)
-
+        js = ('admin/js/question_admin.js',)
 
 class QuestionResponseInline(admin.TabularInline):
     model = QuestionResponse
-    readonly_fields = ["question", "answer", "answer_type", "created_at"]
+    readonly_fields = ['question', 'answer', 'answer_type', 'created_at']
     extra = 0
     can_delete = False
 
-
 @admin.register(SurveyResponse)
 class SurveyResponseAdmin(admin.ModelAdmin):
-    list_display = ["survey", "get_email", "submitted_at", "ip_address"]
-    list_filter = ["submitted_at", "survey"]
-    search_fields = ["survey__title", "question_responses__answer_text"]
-    readonly_fields = ["submitted_at", "ip_address", "user_agent"]
+    list_display = ['survey', 'get_email', 'submitted_at', 'ip_address']
+    list_filter = ['submitted_at', 'survey']
+    search_fields = ['survey__title', 'question_responses__answer_text']
+    readonly_fields = ['submitted_at', 'ip_address', 'user_agent']
     inlines = [QuestionResponseInline]
     list_per_page = 25
-
+    
     def get_email(self, obj):
         """Extract email from question responses"""
-        email_response = obj.question_responses.filter(question__secondary_type="email").first()
-        if email_response and email_response.answer_type == "email":
+        email_response = obj.question_responses.filter(
+            question__secondary_type='email'
+        ).first()
+        if email_response and email_response.answer_type == 'email':
             return email_response.answer
         return "No email"
-
-    get_email.short_description = "Email"
-    get_email.admin_order_field = "question_responses__answer"
-
+    get_email.short_description = 'Email'
+    get_email.admin_order_field = 'question_responses__answer'
+    
     def get_name(self, obj):
         """Extract name from question responses (assuming first text question might be name)"""
-        name_response = obj.question_responses.filter(question__secondary_type="text").first()
-        if name_response and name_response.answer_type == "text":
+        name_response = obj.question_responses.filter(
+            question__secondary_type='text'
+        ).first()
+        if name_response and name_response.answer_type == 'text':
             name = str(name_response.answer).strip()
-            return name[:30] + "..." if len(name) > 30 else name
+            return name[:30] + '...' if len(name) > 30 else name
         return "No name"
-
-    get_name.short_description = "Name"
-
+    get_name.short_description = 'Name'
+    
     def get_queryset(self, request):
         """Optimize queryset to reduce database queries"""
-        return super().get_queryset(request).prefetch_related("question_responses__question")
-
+        return super().get_queryset(request).prefetch_related(
+            'question_responses__question'
+        )
+    
     def has_add_permission(self, request):
         return False  # Responses should only be created via API
 
-
 @admin.register(QuestionResponse)
 class QuestionResponseAdmin(admin.ModelAdmin):
-    list_display = [
-        "question",
-        "survey_response",
-        "get_answer_display",
-        "answer_type",
-        "created_at",
-    ]
-    list_filter = ["question__primary_type", "question__secondary_type", "created_at"]
-    search_fields = ["question__question_text", "answer"]
-    readonly_fields = ["survey_response", "question", "answer", "answer_type", "created_at"]
-
+    list_display = ['question', 'survey_response', 'get_answer_display', 'answer_type', 'created_at']
+    list_filter = ['question__primary_type', 'question__secondary_type', 'created_at']
+    search_fields = ['question__question_text', 'answer']
+    readonly_fields = ['survey_response', 'question', 'answer', 'answer_type', 'created_at']
+    
     def get_answer_display(self, obj):
-        if obj.answer_type in ["text", "email", "number"]:
-            return str(obj.answer)[:50] + "..." if len(str(obj.answer)) > 50 else str(obj.answer)
-        elif obj.answer_type == "rating":
+        if obj.answer_type in ['text', 'email', 'number']:
+            return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
+        elif obj.answer_type == 'rating':
             return f"Rating: {obj.answer}"
-        elif obj.answer_type in ["multiple_choice", "checkbox", "multiple_choices"]:
+        elif obj.answer_type in ['multiple_choice', 'checkbox']:
             if isinstance(obj.answer, list):
                 return f"Choices: {', '.join(map(str, obj.answer))}"
             return f"Choice: {obj.answer}"
         return "No answer"
-
-    get_answer_display.short_description = "Answer"
-
+    get_answer_display.short_description = 'Answer'
+    
     def has_add_permission(self, request):
         return False  # Responses should only be created via API
 
 
 @admin.register(PartialSurveyResponse)
 class PartialSurveyResponseAdmin(admin.ModelAdmin):
-    list_display = [
-        "question",
-        "survey",
-        "get_answer_display",
-        "answer_type",
-        "ip_address",
-        "session_id",
-        "is_completed",
-        "created_at",
-    ]
-    list_filter = [
-        "question__primary_type",
-        "question__secondary_type",
-        "is_completed",
-        "created_at",
-        "survey",
-    ]
-    search_fields = ["question__question_text", "answer", "ip_address", "session_id"]
-    readonly_fields = [
-        "survey",
-        "question",
-        "answer",
-        "answer_type",
-        "ip_address",
-        "user_agent",
-        "session_id",
-        "is_completed",
-        "created_at",
-        "updated_at",
-    ]
-
+    list_display = ['question', 'survey', 'get_answer_display', 'answer_type', 'ip_address', 'session_id', 'is_completed', 'created_at']
+    list_filter = ['question__primary_type', 'question__secondary_type', 'is_completed', 'created_at', 'survey']
+    search_fields = ['question__question_text', 'answer', 'ip_address', 'session_id']
+    readonly_fields = ['survey', 'question', 'answer', 'answer_type', 'ip_address', 'user_agent', 'session_id', 'is_completed', 'created_at', 'updated_at']
+    
     def get_answer_display(self, obj):
-        if obj.answer_type in ["text", "email", "number"]:
-            return str(obj.answer)[:50] + "..." if len(str(obj.answer)) > 50 else str(obj.answer)
-        elif obj.answer_type == "rating":
+        if obj.answer_type in ['text', 'email', 'number']:
+            return str(obj.answer)[:50] + '...' if len(str(obj.answer)) > 50 else str(obj.answer)
+        elif obj.answer_type == 'rating':
             return f"Rating: {obj.answer}"
-        elif obj.answer_type in ["multiple_choice", "checkbox", "multiple_choices"]:
+        elif obj.answer_type in ['multiple_choice', 'checkbox']:
             if isinstance(obj.answer, list):
                 return f"Choices: {', '.join(map(str, obj.answer))}"
             return f"Choice: {obj.answer}"
         return "No answer"
-
-    get_answer_display.short_description = "Answer"
-
+    get_answer_display.short_description = 'Answer'
+    
     def has_add_permission(self, request):
         return False  # Partial responses should only be created via API
