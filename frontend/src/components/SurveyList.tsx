@@ -27,7 +27,9 @@ export default function SurveyList({ onSurveySelect }: SurveyListProps) {
         const data = await apiService.getSurveys();
         setSurveys(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch surveys");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch surveys"
+        );
       } finally {
         setLoading(false);
       }
@@ -62,25 +64,33 @@ export default function SurveyList({ onSurveySelect }: SurveyListProps) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Surveys</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        Available Surveys
+      </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {surveys.map(survey => (
+        {surveys.map((survey) => (
           <div
             key={survey.id}
             className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => onSurveySelect(survey.id)}
           >
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{survey.title}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+                {survey.title}
+              </h3>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 {survey.question_count} questions
               </span>
             </div>
 
-            <p className="text-gray-600 text-sm mb-4 line-clamp-3">{survey.description}</p>
+            <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+              {survey.description}
+            </p>
 
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Created: {new Date(survey.created_at).toLocaleDateString()}</span>
+              <span>
+                Created: {new Date(survey.created_at).toLocaleDateString()}
+              </span>
               <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                 Active
               </span>

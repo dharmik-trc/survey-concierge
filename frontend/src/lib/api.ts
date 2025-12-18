@@ -1,6 +1,7 @@
 // API service for communicating with Django backend
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:9000/api/survey";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:9000/api/survey";
 
 export interface Question {
   id: number;
@@ -93,7 +94,10 @@ export interface SubmitResponse {
 }
 
 class ApiService {
-  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options?: RequestInit
+  ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, {
       headers: {
@@ -104,7 +108,9 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`
+      );
     }
 
     return response.json();
@@ -133,7 +139,10 @@ class ApiService {
   async getSurveyMeta(
     surveyId: string,
     signal?: AbortSignal
-  ): Promise<{ id: string; title: string; description: string; is_active: boolean } | Survey> {
+  ): Promise<
+    | { id: string; title: string; description: string; is_active: boolean }
+    | Survey
+  > {
     return this.request(`/surveys/${surveyId}/?include_inactive=true`, {
       signal,
     });
@@ -149,15 +158,24 @@ class ApiService {
       params.append("include_inactive", "true");
     }
     const queryString = params.toString();
-    const url = `/surveys/${surveyId}/questions/${queryString ? `?${queryString}` : ""}`;
+    const url = `/surveys/${surveyId}/questions/${
+      queryString ? `?${queryString}` : ""
+    }`;
     return this.request<Question[]>(url, {
       signal: options?.signal,
     });
   }
 
   // Get a specific question
-  async getQuestion(surveyId: string, questionId: number, signal?: AbortSignal): Promise<Question> {
-    return this.request<Question>(`/surveys/${surveyId}/questions/${questionId}/`, { signal });
+  async getQuestion(
+    surveyId: string,
+    questionId: number,
+    signal?: AbortSignal
+  ): Promise<Question> {
+    return this.request<Question>(
+      `/surveys/${surveyId}/questions/${questionId}/`,
+      { signal }
+    );
   }
 
   // Submit survey responses
@@ -203,7 +221,9 @@ class ApiService {
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Failed to export responses: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to export responses: ${response.status} ${response.statusText}`
+      );
     }
 
     // Get the blob and create a download link
@@ -241,7 +261,9 @@ class ApiService {
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Failed to export analytics: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to export analytics: ${response.status} ${response.statusText}`
+      );
     }
 
     // Get the blob and create a download link
@@ -582,7 +604,9 @@ export const optionUtils = {
     let processedOptions = [...baseOptions];
     if (question.randomize_options && baseOptions.length > 0) {
       // Use seeded randomization for consistent results per user
-      const seed = surveyId ? `${surveyId}-${question.id}-options` : `${question.id}-options`;
+      const seed = surveyId
+        ? `${surveyId}-${question.id}-options`
+        : `${question.id}-options`;
       processedOptions = shuffleWithSeed(baseOptions, seed);
     }
 
@@ -630,7 +654,10 @@ export const optionUtils = {
    * Simple check for exclusive options
    */
   isExclusiveOption: (option: string): boolean => {
-    return option.toLowerCase().includes("don't know") || option.toLowerCase().includes("none");
+    return (
+      option.toLowerCase().includes("don't know") ||
+      option.toLowerCase().includes("none")
+    );
   },
 
   /**
@@ -644,7 +671,10 @@ export const optionUtils = {
   /**
    * Organize options into columns (up to 6 per column, balanced when splitting)
    */
-  organizeOptionsIntoColumns: (options: string[], maxPerColumn: number = 6): string[][] => {
+  organizeOptionsIntoColumns: (
+    options: string[],
+    maxPerColumn: number = 6
+  ): string[][] => {
     if (options.length <= maxPerColumn) {
       return [options]; // Single column for 6 or fewer options
     }

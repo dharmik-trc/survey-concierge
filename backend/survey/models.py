@@ -1,6 +1,5 @@
-import uuid
-
 from django.db import models
+import uuid
 
 # Create your models here.
 # Once you change this, you need to change question_admin.js
@@ -37,28 +36,16 @@ class Survey(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    logo_url = models.CharField(
-        blank=True, null=True, help_text="URL to the logo for this survey", max_length=200
-    )
-    concierge_logo_url = models.URLField(
-        blank=True, null=True, help_text="URL to the Survey Concierge logo for this survey"
-    )
+    logo_url = models.CharField(blank=True, null=True, help_text="URL to the logo for this survey", max_length=200)
+    concierge_logo_url = models.URLField(blank=True, null=True, help_text="URL to the Survey Concierge logo for this survey")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-    store_basic_details = models.BooleanField(
-        default=False,
-        help_text="Enable storing basic details (like email) when users click Next on specific questions",
-    )
-    thank_you_message = models.TextField(
-        blank=True,
-        null=True,
-        help_text="Custom thank you message shown after survey submission. Leave blank for default message.",
-    )
-
+    store_basic_details = models.BooleanField(default=False, help_text="Enable storing basic details (like email) when users click Next on specific questions")
+    thank_you_message = models.TextField(blank=True, null=True, help_text='Custom thank you message shown after survey submission. Leave blank for default message.')
+    
     def __str__(self):
         return self.title
-
 
 class Question(models.Model):
     PRIMARY_TYPES = [
@@ -84,79 +71,34 @@ class Question(models.Model):
     is_required = models.BooleanField(default=True)
     order = models.IntegerField(default=0)
     randomize_options = models.BooleanField(default=False)
-
+    
     # Special option controls
-    has_none_option = models.BooleanField(
-        default=False, help_text='Add "None of the above" option (always appears last)'
-    )
-    none_option_text = models.CharField(
-        max_length=999,
-        blank=True,
-        null=True,
-        help_text='Custom text for "None of the above" option (defaults to "None of the above" if empty)',
-    )
-    has_other_option = models.BooleanField(
-        default=False, help_text='Add "Other (please specify)" option with text input'
-    )
-
+    has_none_option = models.BooleanField(default=False, help_text='Add "None of the above" option (always appears last)')
+    none_option_text = models.CharField(max_length=999, blank=True, null=True, help_text='Custom text for "None of the above" option (defaults to "None of the above" if empty)')
+    has_other_option = models.BooleanField(default=False, help_text='Add "Other (please specify)" option with text input')
+    
     # Grid-specific controls
-    exclusive_column = models.CharField(
-        max_length=999,
-        blank=True,
-        null=True,
-        help_text="Column name that should be exclusive (only one option can be selected per row)",
-    )
-    randomize_rows = models.BooleanField(
-        default=False, help_text="Randomize the order of rows in grid questions"
-    )
-    randomize_columns = models.BooleanField(
-        default=False, help_text="Randomize the order of columns in grid questions"
-    )
-
+    exclusive_column = models.CharField(max_length=999, blank=True, null=True, help_text='Column name that should be exclusive (only one option can be selected per row)')
+    randomize_rows = models.BooleanField(default=False, help_text='Randomize the order of rows in grid questions')
+    randomize_columns = models.BooleanField(default=False, help_text='Randomize the order of columns in grid questions')
+    
     # Comment box (separate from Other option)
-    has_comment_box = models.BooleanField(
-        default=False, help_text="Add a separate comment box for additional notes"
-    )
-    comment_box_rows = models.IntegerField(
-        default=3, help_text="Number of rows for comment box (1-10)"
-    )
-    comment_box_label = models.CharField(
-        max_length=999,
-        blank=True,
-        null=True,
-        help_text='Custom label for comment box (e.g., "Additional comments")',
-    )
-    comment_box_trigger_value = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text='Only show comment box when this answer is selected (e.g., "Yes"). Leave blank to always show comment box.',
-    )
-
+    has_comment_box = models.BooleanField(default=False, help_text='Add a separate comment box for additional notes')
+    comment_box_rows = models.IntegerField(default=3, help_text='Number of rows for comment box (1-10)')
+    comment_box_label = models.CharField(max_length=999, blank=True, null=True, help_text='Custom label for comment box (e.g., "Additional comments")')
+    comment_box_trigger_value = models.CharField(max_length=255, blank=True, null=True, help_text='Only show comment box when this answer is selected (e.g., "Yes"). Leave blank to always show comment box.')
+    
     # Basic details storage
-    store_on_next = models.BooleanField(
-        default=False,
-        help_text="Store this question's answer when user clicks Next (only works if survey has store_basic_details enabled)",
-    )
-
-    row_count = models.IntegerField(default=1, help_text="Number of rows for text questions")
-
+    store_on_next = models.BooleanField(default=False, help_text='Store this question\'s answer when user clicks Next (only works if survey has store_basic_details enabled)')
+    
+    row_count = models.IntegerField(default=1, help_text='Number of rows for text questions')
+    
     # Slider/Scale specific fields
-    scale_min = models.IntegerField(
-        default=0, help_text="Minimum value for slider/scale (e.g., 0 for NPS)"
-    )
-    scale_max = models.IntegerField(
-        default=10, help_text="Maximum value for slider/scale (e.g., 10 for NPS)"
-    )
-    scale_step = models.IntegerField(
-        default=1, help_text="Step increment for slider (e.g., 1 for whole numbers)"
-    )
-    scale_min_label = models.CharField(
-        max_length=100, default="Not at all likely", blank=True, help_text="Label for minimum value"
-    )
-    scale_max_label = models.CharField(
-        max_length=100, default="Extremely likely", blank=True, help_text="Label for maximum value"
-    )
+    scale_min = models.IntegerField(default=0, help_text='Minimum value for slider/scale (e.g., 0 for NPS)')
+    scale_max = models.IntegerField(default=10, help_text='Maximum value for slider/scale (e.g., 10 for NPS)')
+    scale_step = models.IntegerField(default=1, help_text='Step increment for slider (e.g., 1 for whole numbers)')
+    scale_min_label = models.CharField(max_length=100, default='Not at all likely', blank=True, help_text='Label for minimum value')
+    scale_max_label = models.CharField(max_length=100, default='Extremely likely', blank=True, help_text='Label for maximum value')
 
     # Options
     options = models.JSONField(blank=True, null=True)
@@ -164,11 +106,7 @@ class Question(models.Model):
     # Extra structures
     section_title = models.CharField(max_length=999, blank=True, null=True)
     subfields = models.JSONField(blank=True, null=True)
-    subfield_validations = models.JSONField(
-        blank=True,
-        null=True,
-        help_text='Validation rules for each subfield: {"field_name": {"type": "positive_number|negative_number|email|text", "required": true}}',
-    )
+    subfield_validations = models.JSONField(blank=True, null=True, help_text='Validation rules for each subfield: {"field_name": {"type": "positive_number|negative_number|email|text", "required": true}}')
     rows = models.JSONField(blank=True, null=True)
     columns = models.JSONField(blank=True, null=True)
 
@@ -200,27 +138,24 @@ class Question(models.Model):
 
 class SurveyResponse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name="responses")
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='responses')
     submitted_at = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True)
-
+    
     def __str__(self):
         return f"Response to {self.survey.title} - {self.submitted_at}"
 
-
 class QuestionResponse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    survey_response = models.ForeignKey(
-        SurveyResponse, on_delete=models.CASCADE, related_name="question_responses"
-    )
+    survey_response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='question_responses')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answer = models.JSONField()  # Store any type of answer as JSON
     answer_type = models.CharField(max_length=100)  # e.g., 'text', 'number', 'choices', etc.
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["survey_response", "question"]
+        unique_together = ['survey_response', 'question']
 
     def __str__(self):
         return f"Response to {self.question.question_text[:30]} ({self.answer_type})"
@@ -228,31 +163,25 @@ class QuestionResponse(models.Model):
 
 class PartialSurveyResponse(models.Model):
     """Store partial responses for surveys that have store_basic_details enabled"""
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name="partial_responses")
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='partial_responses')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answer = models.JSONField()  # Store the answer as JSON
     answer_type = models.CharField(max_length=100)  # e.g., 'text', 'email', 'number', etc.
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True)
-    session_id = models.CharField(
-        max_length=100, blank=True, null=True, help_text="Browser session ID to track user"
-    )
-    is_completed = models.BooleanField(
-        default=False,
-        help_text="True if this partial response was converted to a complete survey response",
-    )
+    session_id = models.CharField(max_length=100, blank=True, null=True, help_text="Browser session ID to track user")
+    is_completed = models.BooleanField(default=False, help_text="True if this partial response was converted to a complete survey response")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ["survey", "question", "ip_address", "session_id"]
+        unique_together = ['survey', 'question', 'ip_address', 'session_id']
         indexes = [
-            models.Index(fields=["survey", "ip_address"]),
-            models.Index(fields=["survey", "session_id"]),
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["is_completed"]),
+            models.Index(fields=['survey', 'ip_address']),
+            models.Index(fields=['survey', 'session_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_completed']),
         ]
 
     def __str__(self):
