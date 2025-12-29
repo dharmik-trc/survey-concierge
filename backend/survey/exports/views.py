@@ -1120,6 +1120,12 @@ def preview_filtered_analytics(request, survey_id):
         # Import helper function for numeric parsing
         from .segmentation_engine import _get_total_fte_from_form_fields, _parse_numeric_value
 
+        # Create mapping from question_id to position in all_questions list (for correct numbering)
+        # This matches the numbering used in Excel exports
+        question_number_map = {}
+        for idx, q in enumerate(all_questions, start=1):
+            question_number_map[q.id] = idx
+
         # Validate all filters
         filter_questions = {}
         filter_info_list = []
@@ -1162,9 +1168,11 @@ def preview_filtered_analytics(request, survey_id):
                 }
                 range_min, range_max = numeric_range
                 range_desc = f"[{range_min if range_min is not None else 'min'}, {range_max if range_max is not None else 'max'}]"
+                # Use position in all_questions list to match Excel numbering
+                question_num = question_number_map.get(filter_question.id, (filter_question.order or 0) + 1)
                 filter_info_list.append(
                     {
-                        "filter_question": f"Q{filter_question.order + 1}: {filter_question.question_text[:100]}",
+                        "filter_question": f"Q{question_num}: {filter_question.question_text[:100]}",
                         "numeric_range": range_desc,
                     }
                 )
@@ -1182,9 +1190,11 @@ def preview_filtered_analytics(request, survey_id):
                     "type": "choice",
                     "selected_options": selected_options,
                 }
+                # Use position in all_questions list to match Excel numbering
+                question_num = question_number_map.get(filter_question.id, (filter_question.order or 0) + 1)
                 filter_info_list.append(
                     {
-                        "filter_question": f"Q{filter_question.order + 1}: {filter_question.question_text[:100]}",
+                        "filter_question": f"Q{question_num}: {filter_question.question_text[:100]}",
                         "selected_options": selected_options,
                     }
                 )
