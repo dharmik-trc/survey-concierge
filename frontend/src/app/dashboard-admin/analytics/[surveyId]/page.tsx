@@ -699,12 +699,17 @@ export default function AnalyticsPage() {
                                     )) ||
                                   (q.primary_type === "form" && q.secondary_type === "form_fields")
                               )
-                              .map(q => (
-                                <option key={q.id} value={q.id}>
-                                  Q{q.order + 1}: {q.question_text.substring(0, 60)}
-                                  {q.question_text.length > 60 ? "..." : ""}
-                                </option>
-                              ))
+                              .map(q => {
+                                // Use position in full surveyQuestions array to match Excel numbering
+                                const questionNumber =
+                                  surveyQuestions.findIndex(sq => sq.id === q.id) + 1;
+                                return (
+                                  <option key={q.id} value={q.id}>
+                                    Q{questionNumber}: {q.question_text.substring(0, 60)}
+                                    {q.question_text.length > 60 ? "..." : ""}
+                                  </option>
+                                );
+                              })
                           : surveyQuestions
                               .filter(
                                 q =>
@@ -713,12 +718,17 @@ export default function AnalyticsPage() {
                                     q.secondary_type || ""
                                   )
                               )
-                              .map(q => (
-                                <option key={q.id} value={q.id}>
-                                  Q{q.order + 1}: {q.question_text.substring(0, 60)}
-                                  {q.question_text.length > 60 ? "..." : ""}
-                                </option>
-                              ))}
+                              .map(q => {
+                                // Use position in full surveyQuestions array to match Excel numbering
+                                const questionNumber =
+                                  surveyQuestions.findIndex(sq => sq.id === q.id) + 1;
+                                return (
+                                  <option key={q.id} value={q.id}>
+                                    Q{questionNumber}: {q.question_text.substring(0, 60)}
+                                    {q.question_text.length > 60 ? "..." : ""}
+                                  </option>
+                                );
+                              })}
                       </select>
                     </div>
 
@@ -999,9 +1009,9 @@ export default function AnalyticsPage() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                       >
                         <option value={0}>Select a question...</option>
-                        {surveyQuestions.map(q => (
+                        {surveyQuestions.map((q, idx) => (
                           <option key={q.id} value={q.id}>
-                            Q{q.order + 1}: {q.question_text.substring(0, 60)}
+                            Q{idx + 1}: {q.question_text.substring(0, 60)}
                             {q.question_text.length > 60 ? "..." : ""}
                           </option>
                         ))}
