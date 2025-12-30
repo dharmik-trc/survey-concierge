@@ -1287,7 +1287,7 @@ def preview_filtered_analytics(request, survey_id):
             if matches_all_filters:
                 filtered_sessions[session_id] = session_data
 
-        filtered_count = len(filtered_sessions)
+        filtered_response_count = len(filtered_sessions)
         total_count = len(sessions)
 
         if not filtered_sessions:
@@ -1331,11 +1331,11 @@ def preview_filtered_analytics(request, survey_id):
                 for q in all_questions
                 if not (q.primary_type == "open_text" and q.secondary_type in ["text", "paragraph"])
             ]
-            filtered_count = len(questions_to_include)
 
         # Calculate analytics for filtered sessions
+        # Note: filtered_response_count is the number of filtered responses, not questions
         analytics = calculate_analytics(
-            filtered_sessions, questions_to_include, filtered_count, response_metadata
+            filtered_sessions, questions_to_include, filtered_response_count, response_metadata
         )
 
         # Build preview data - simplified version for UI display
@@ -1376,7 +1376,7 @@ def preview_filtered_analytics(request, survey_id):
 
         return Response(
             {
-                "filtered_count": filtered_count,
+                "filtered_count": filtered_response_count,
                 "total_count": total_count,
                 "filters": filter_info_list,
                 "preview_data": preview_data,
