@@ -9,7 +9,9 @@ from .exports import (
     preview_segmented_analytics,
 )
 from .views import (
+    analytics_chat,
     health_check,
+    llm_status,
     question_detail,
     questions_by_survey,
     save_partial_response,
@@ -21,6 +23,7 @@ from .views import (
 
 urlpatterns = [
     path("health/", health_check, name="health_check"),
+    path("llm/status/", llm_status, name="llm_status"),
     path("upload_excel/", upload_excel, name="upload_excel"),
     path("surveys/", survey_list, name="survey_list"),
     path("surveys/<uuid:survey_id>/", survey_detail, name="survey_detail"),
@@ -61,5 +64,10 @@ urlpatterns = [
         "surveys/<uuid:survey_id>/analytics/preview-filtered/",
         preview_filtered_analytics,
         name="preview_filtered_analytics",
+    ),
+    path(
+        "surveys/<uuid:survey_id>/analytics/chat/",
+        analytics_chat,
+        name="analytics_chat",
     ),
 ]

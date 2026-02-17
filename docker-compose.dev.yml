@@ -28,6 +28,8 @@ services:
       - DATABASE_URL=postgresql://survey_user:survey_password@postgres:5432/survey_db
       - USE_X_FORWARDED_HOST=True
       - USE_X_FORWARDED_PORT=True
+      # Ollama runs on host - use host.docker.internal to reach it from container
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     depends_on:
       - postgres
     restart: unless-stopped

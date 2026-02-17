@@ -544,6 +544,23 @@ class ApiService {
 
     return response.json();
   }
+
+  // AI analytics chat - ask questions about survey data
+  async analyticsChat(
+    surveyId: string,
+    message: string,
+    history?: Array<{ role: string; content: string }>
+  ): Promise<{ reply: string }> {
+    return this.request<{ reply: string }>(`/surveys/${surveyId}/analytics/chat/`, {
+      method: "POST",
+      body: JSON.stringify({ message, history: history || [] }),
+    });
+  }
+
+  // Check if LLM (e.g. Ollama) is available
+  async getLlmStatus(): Promise<{ provider: string; available: boolean; error?: string }> {
+    return this.request<{ provider: string; available: boolean; error?: string }>("/llm/status/");
+  }
 }
 
 export const apiService = new ApiService();

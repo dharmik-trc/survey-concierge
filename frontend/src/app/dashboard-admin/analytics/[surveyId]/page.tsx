@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiService, Question } from "@/lib/api";
 import ConciergeLogo from "@/components/ConciergeLogo";
+import AnalyticsChatPanel from "@/components/AnalyticsChatPanel";
 
 export default function AnalyticsPage() {
   const params = useParams();
@@ -13,7 +14,7 @@ export default function AnalyticsPage() {
   const [surveyQuestions, setSurveyQuestions] = useState<Question[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [surveyTitle, setSurveyTitle] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"filter" | "segmentation">("filter");
+  const [activeTab, setActiveTab] = useState<"filter" | "segmentation" | "chat">("filter");
 
   // Filter state
   const [filterConfigs, setFilterConfigs] = useState<
@@ -536,6 +537,16 @@ export default function AnalyticsPage() {
               }`}
             >
               Segmented Analytics
+            </button>
+            <button
+              onClick={() => setActiveTab("chat")}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "chat"
+                  ? "border-emerald-500 text-emerald-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              AI Chat
             </button>
           </nav>
         </div>
@@ -1203,6 +1214,33 @@ export default function AnalyticsPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* AI Chat Tab Content */}
+        {activeTab === "chat" && (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Share the public chat link for others to explore survey insights
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  const url = `${typeof window !== "undefined" ? window.location.origin : ""}/survey/${surveyId}/chat`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert("Chat link copied! Share it publicly.");
+                  } catch {
+                    alert(`Share this link: ${url}`);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 border border-orange-200"
+              >
+                Copy shareable chat link
+              </button>
+            </div>
+            <AnalyticsChatPanel surveyId={surveyId} />
           </div>
         )}
       </div>

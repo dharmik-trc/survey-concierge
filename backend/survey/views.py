@@ -309,3 +309,56 @@ def save_partial_response(request, survey_id, question_id):
             {"error": "Failed to save partial response", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def analytics_chat(request, survey_id):
+    """Chat with AI about survey analytics. POST { message, history?: [{role, content}] }"""
+    try:
+        data = request.data or {}
+        message = data.get("message", "").strip()
+        history = data.get("history") or []
+        if not message:
+            return Response(
+                {"error": "message is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(history, list):
+            history = []
+        history = [
+            {"role": h.get("role", "user"), "content": str(h.get("content", ""))}
+            for h in history[:20]
+            if h.get("role") and h.get("content")
+        ]
+        from .services.ai_analyzer import chat_with_analyzer
+
+        reply = chat_with_analyzer(str(survey_id), message, history)
+        return Response({"reply": reply}, status=status.HTTP_200_OK)
+    except Exception as e:
+        import traceback
+
+        return Response(
+            {"error": "Chat failed", "details": str(e), "traceback": traceback.format_exc()},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def llm_status(request):
+    """Check if Ollama is available."""
+    try:
+        from .llm import get_llm_provider
+        provider = get_llm_provider()
+        available = provider.is_available()
+        return Response({
+            "provider": "ollama",
+            "available": available,
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            "provider": "unknown",
+            "available": False,
+            "error": str(e),
+        }, status=status.HTTP_200_OK)
