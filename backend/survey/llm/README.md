@@ -6,17 +6,13 @@ The AI Chat uses **Ollama** (local, free) to analyze survey data.
 
 ### Docker (recommended)
 
-Ollama runs as a service in Docker Compose:
+Ollama runs as a service in Docker Compose and automatically pulls `llama3.2` on first start:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Pull the model (once):
-
-```bash
-docker compose -f docker-compose.dev.yml exec ollama ollama pull llama3.2
-```
+The first startup may take a few minutes while the model downloads (~2GB). Subsequent restarts are fast.
 
 ### Local install (no Docker)
 
